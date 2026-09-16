@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build output
+build/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Local CMake configuration
+CMakeUserPresets.json
+
+# Testing / profiling
+Testing/
+*.profraw
+*.profdata
+*.gcda
+*.gcno
+*.gcov
+perf.data
+perf.data.old
+
+# Logs
+*.log
+
+# Local environment
+.env
+.env.*
+secrets/
+
+# Temporary files
+*.tmp
+*.temp
