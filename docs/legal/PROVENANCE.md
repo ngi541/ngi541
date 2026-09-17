@@ -122,3 +122,38 @@ confidential material forms part of this import.
 
 NGI541-specific development following this baseline is maintained separately
 in the NGI541 Git history.
+
+#### Imported support infrastructure
+
+The cryptographic core depends on a limited subset of FD.io VPP
+infrastructure headers.
+
+The following files were imported from the same upstream revision without
+semantic modification:
+
+| Upstream source | NGI541 destination |
+| --- | --- |
+| `src/vppinfra/atomics.h` | `src/support/vppinfra/atomics.h` |
+| `src/vppinfra/bitops.h` | `src/support/vppinfra/bitops.h` |
+| `src/vppinfra/byte_order.h` | `src/support/vppinfra/byte_order.h` |
+| `src/vppinfra/cache.h` | `src/support/vppinfra/cache.h` |
+| `src/vppinfra/clib.h` | `src/support/vppinfra/clib.h` |
+| `src/vppinfra/error_bootstrap.h` | `src/support/vppinfra/error_bootstrap.h` |
+| `src/vppinfra/memcpy.h` | `src/support/vppinfra/memcpy.h` |
+| `src/vppinfra/memcpy_x86_64.h` | `src/support/vppinfra/memcpy_x86_64.h` |
+| `src/vppinfra/string.h` | `src/support/vppinfra/string.h` |
+| `src/vppinfra/types.h` | `src/support/vppinfra/types.h` |
+| `src/vppinfra/vector.h` | `src/support/vppinfra/vector.h` |
+| `src/vppinfra/vector_altivec.h` | `src/support/vppinfra/vector_altivec.h` |
+| `src/vppinfra/vector_avx2.h` | `src/support/vppinfra/vector_avx2.h` |
+| `src/vppinfra/vector_avx512.h` | `src/support/vppinfra/vector_avx512.h` |
+| `src/vppinfra/vector_neon.h` | `src/support/vppinfra/vector_neon.h` |
+| `src/vppinfra/vector_sse42.h` | `src/support/vppinfra/vector_sse42.h` |
+| `src/vppinfra/warnings.h` | `src/support/vppinfra/warnings.h` |
+
+These files form the initial compatibility layer required by the imported
+cryptographic core.
+
+They are intentionally isolated under `src/support/vppinfra/` so that their
+future replacement or reduction can be performed independently from the
+cryptographic algorithms.
