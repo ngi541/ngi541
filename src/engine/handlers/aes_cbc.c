@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright (c) 2019 Cisco and/or its affiliates.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
-#include <native/sha2.h>
-#include <vppinfra/crypto/aes_cbc.h>
+#include "engine/handlers/sha2.h"
+#include "core/aes/aes_cbc.h"
 
 #if __GNUC__ > 4  && !__clang__ && CLIB_DEBUG == 0
 #pragma GCC optimize ("O3")

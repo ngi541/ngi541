@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright(c) 2025 Cisco Systems, Inc.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
 #include <vlib/vlib.h>
-#include <vnet/crypto/crypto.h>
-#include <vnet/crypto/engine.h>
+#include "engine/crypto.h"
+#include "engine/engine.h"
 
 vnet_crypto_main_t crypto_main =
 {

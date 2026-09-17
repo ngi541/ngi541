@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright(c) 2023 Cisco Systems, Inc.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
 #ifndef __crypto_aes_gcm_h__
@@ -9,8 +11,8 @@
 #include <vppinfra/vector.h>
 #include <vppinfra/cache.h>
 #include <vppinfra/string.h>
-#include <vppinfra/crypto/aes.h>
-#include <vppinfra/crypto/ghash.h>
+#include "core/aes/aes.h"
+#include "core/aes/ghash.h"
 
 #define NUM_HI 36
 #if N_AES_LANES == 4

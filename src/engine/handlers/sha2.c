@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright(c) 2024 Cisco Systems, Inc.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
-#include <native/sha2.h>
+#include "engine/handlers/sha2.h"
 
 static_always_inline u32
 crypto_native_ops_hash_sha2 (vnet_crypto_op_t *ops[], u32 n_ops, vnet_crypto_op_chunk_t *chunks,

@@ -157,3 +157,15 @@ cryptographic core.
 They are intentionally isolated under `src/support/vppinfra/` so that their
 future replacement or reduction can be performed independently from the
 cryptographic algorithms.
+
+#### NGI541 modification phase
+
+Following the exact upstream import, NGI541 development modifies the imported
+crypto and engine sources to use the NGI541 source-tree layout.
+
+The first modification phase replaces upstream VPP source-tree include paths
+with NGI541 internal paths while preserving the imported cryptographic
+algorithms, operation model, engine model, and low-level support implementation.
+
+The compatibility files under `src/support/vppinfra/` remain unmodified from
+the recorded upstream baseline at this stage.

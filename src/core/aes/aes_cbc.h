@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright(c) 2023 Cisco Systems, Inc.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
 #ifndef __crypto_aes_cbc_h__
@@ -7,7 +9,7 @@
 
 #include <vppinfra/clib.h>
 #include <vppinfra/vector.h>
-#include <vppinfra/crypto/aes.h>
+#include "core/aes/aes.h"
 
 typedef struct
 {

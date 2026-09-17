@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright (c) 2019 Cisco and/or its affiliates.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
 #ifndef __crypto_native_h__

@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright (c) 2024 Cisco Systems, Inc.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
 #ifndef included_vnet_crypto_engine_h

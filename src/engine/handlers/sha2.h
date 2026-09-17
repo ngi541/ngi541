@@ -1,13 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright (c) 2025 Cisco and/or its affiliates.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
 #ifndef __sha2_h__
 #define __sha2_h__
 
-#include <vnet/crypto/crypto.h>
-#include <native/crypto_native.h>
-#include <vppinfra/crypto/sha2.h>
+#include "engine/crypto.h"
+#include "engine/crypto_native.h"
+#include "core/sha/sha2.h"
 
 static_always_inline u32
 crypto_native_ops_hmac_sha2 (vnet_crypto_op_t *ops[], u32 n_ops, vnet_crypto_op_chunk_t *chunks,

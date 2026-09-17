@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright (c) 2024 Cisco Systems, Inc.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
-#include <vnet/crypto/crypto.h>
-#include <native/crypto_native.h>
-#include <vnet/crypto/engine.h>
+#include "engine/crypto.h"
+#include "engine/crypto_native.h"
+#include "engine/engine.h"
 
 crypto_native_main_t crypto_native_main;
 vnet_crypto_engine_op_handlers_t op_handlers[64], *ophp = op_handlers;

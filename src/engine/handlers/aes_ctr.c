@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright(c) 2024 Cisco Systems, Inc.
+ *
+ * Modified for NGI541: source layout and include paths.
  */
 
-#include <vnet/crypto/crypto.h>
-#include <native/crypto_native.h>
-#include <vppinfra/crypto/aes_ctr.h>
-#include <vppinfra/crypto/sha2.h>
+#include "engine/crypto.h"
+#include "engine/crypto_native.h"
+#include "core/aes/aes_ctr.h"
+#include "core/sha/sha2.h"
 
 #if __GNUC__ > 4 && !__clang__ && CLIB_DEBUG == 0
 #pragma GCC optimize("O3")
