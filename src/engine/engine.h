@@ -7,9 +7,7 @@
 #ifndef included_vnet_crypto_engine_h
 #define included_vnet_crypto_engine_h
 
-#ifndef included_clib_types_h
-typedef unsigned int u32;
-#endif
+#include "engine/crypto_types.h"
 
 typedef struct
 {

@@ -28,6 +28,6 @@ target_include_directories(
 target_link_libraries(
     ngi541_core
     INTERFACE
-        ngi541_support
+        NGI541::support
         ngi541_crypto_isa
 )

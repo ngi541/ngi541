@@ -4,22 +4,27 @@
  * Modified for NGI541: source layout and include paths.
  */
 
-#include "engine/crypto.h"
+#include "engine/crypto_types.h"
 #include "engine/crypto_native.h"
 #include "engine/engine.h"
 
 crypto_native_main_t crypto_native_main;
-vnet_crypto_engine_op_handlers_t op_handlers[64], *ophp = op_handlers;
+
+static vnet_crypto_engine_op_handlers_t
+  op_handlers[VNET_CRYPTO_N_OP_IDS + 1];
 
 static void
-crypto_native_key_handler (vnet_crypto_key_op_t kop, vnet_crypto_key_handler_args_t a)
+crypto_native_key_handler (
+  vnet_crypto_key_op_t kop,
+  vnet_crypto_key_handler_args_t a
+)
 {
   crypto_native_main_t *cm = &crypto_native_main;
 
   if (cm->key_fn[a.alg] == 0)
     return;
 
-  cm->key_fn[a.alg](kop, a);
+  cm->key_fn[a.alg] (kop, a);
 }
 
 static char *
@@ -32,48 +37,66 @@ crypto_native_init (vnet_crypto_engine_registration_t *r)
 
   crypto_native_op_handler_t *oh = cm->op_handlers;
   crypto_native_key_handler_t *kh = cm->key_handlers;
-  crypto_native_op_handler_t **best_by_op_id = 0;
-  crypto_native_key_handler_t **best_by_alg_id = 0;
+
+  crypto_native_op_handler_t
+    *best_by_op_id[VNET_CRYPTO_N_OP_IDS] = { 0 };
+
+  crypto_native_key_handler_t
+    *best_by_alg_id[VNET_CRYPTO_N_ALGS] = { 0 };
+
+  clib_memset (op_handlers, 0, sizeof (op_handlers));
+
+  vnet_crypto_engine_op_handlers_t *ophp = op_handlers;
 
   while (oh)
     {
-      vec_validate (best_by_op_id, oh->op_id);
+      ASSERT (oh->op_id < VNET_CRYPTO_N_OP_IDS);
 
       if (best_by_op_id[oh->op_id] == 0 ||
-	  best_by_op_id[oh->op_id]->priority < oh->priority)
-	best_by_op_id[oh->op_id] = oh;
+          best_by_op_id[oh->op_id]->priority < oh->priority)
+        best_by_op_id[oh->op_id] = oh;
 
       oh = oh->next;
     }
 
   while (kh)
     {
-      vec_validate (best_by_alg_id, kh->alg_id);
+      ASSERT (kh->alg_id < VNET_CRYPTO_N_ALGS);
 
       if (best_by_alg_id[kh->alg_id] == 0 ||
-	  best_by_alg_id[kh->alg_id]->priority < kh->priority)
-	best_by_alg_id[kh->alg_id] = kh;
+          best_by_alg_id[kh->alg_id]->priority < kh->priority)
+        best_by_alg_id[kh->alg_id] = kh;
 
       r->key_data_sz[kh->alg_id] = kh->key_data_sz;
       kh = kh->next;
     }
 
-  vec_foreach_pointer (oh, best_by_op_id)
-    if (oh)
-      {
-	*ophp = (vnet_crypto_engine_op_handlers_t){ .opt = oh->op_id,
-						    .fn = oh->fn,
-						    .cfn = oh->cfn };
-	ophp++;
-	ASSERT ((ophp - op_handlers) < ARRAY_LEN (op_handlers));
-      }
+  for (u32 i = 0; i < VNET_CRYPTO_N_OP_IDS; i++)
+    {
+      oh = best_by_op_id[i];
 
-  vec_foreach_pointer (kh, best_by_alg_id)
-    if (kh)
-      cm->key_fn[kh->alg_id] = kh->key_fn;
+      if (oh)
+        {
+          ASSERT (
+            (uword) (ophp - op_handlers) <
+            ARRAY_LEN (op_handlers) - 1
+          );
 
-  vec_free (best_by_op_id);
-  vec_free (best_by_alg_id);
+          *ophp++ = (vnet_crypto_engine_op_handlers_t) {
+            .opt = oh->op_id,
+            .fn = oh->fn,
+            .cfn = oh->cfn,
+          };
+        }
+    }
+
+  for (u32 i = 0; i < VNET_CRYPTO_N_ALGS; i++)
+    {
+      kh = best_by_alg_id[i];
+
+      if (kh)
+        cm->key_fn[kh->alg_id] = kh->key_fn;
+    }
 
   return 0;
 }

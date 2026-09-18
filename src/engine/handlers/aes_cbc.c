@@ -4,6 +4,8 @@
  * Modified for NGI541: source layout and include paths.
  */
 
+#include <vppinfra/cpu.h>
+
 #include "engine/handlers/sha2.h"
 #include "core/aes/aes_cbc.h"
 

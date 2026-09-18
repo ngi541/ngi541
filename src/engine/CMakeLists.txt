@@ -1,8 +1,6 @@
 add_library(
-    ngi541_engine STATIC
+    ngi541_engine_objects OBJECT
 
-    crypto.c
-    main.c
     native.c
 
     handlers/aes_cbc.c
@@ -11,21 +9,30 @@ add_library(
     handlers/sha2.c
 )
 
-add_library(NGI541::engine ALIAS ngi541_engine)
-
 target_include_directories(
-    ngi541_engine
-
+    ngi541_engine_objects
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/src
-
-    PUBLIC
         ${PROJECT_SOURCE_DIR}/src
 )
 
 target_link_libraries(
-    ngi541_engine
+    ngi541_engine_objects
+    PRIVATE
+        NGI541::core
+)
 
+add_library(
+    ngi541_engine STATIC
+    $<TARGET_OBJECTS:ngi541_engine_objects>
+)
+
+add_library(
+    NGI541::engine
+    ALIAS ngi541_engine
+)
+
+target_link_libraries(
+    ngi541_engine
     PRIVATE
         NGI541::core
 )

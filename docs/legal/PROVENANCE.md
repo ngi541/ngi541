@@ -169,3 +169,32 @@ algorithms, operation model, engine model, and low-level support implementation.
 
 The compatibility files under `src/support/vppinfra/` remain unmodified from
 the recorded upstream baseline at this stage.
+
+## FD.io VPP baseline
+
+Repository:
+https://gerrit.fd.io/r/vpp
+
+Baseline commit:
+d7ed54b83682e753e772274409696d8fa8f8108c
+
+The NGI541 native crypto engine and selected supporting crypto and
+VPPInfra files were extracted from this historical VPP baseline.
+
+### VPPInfra support
+
+`src/support/vppinfra/` contains selected Apache-2.0 licensed VPPInfra
+headers required by the extracted crypto implementation.
+
+NGI541 does not vendor or depend on the complete VPPInfra runtime.
+
+### Compatibility implementation
+
+`src/support/compat/string.c` is an NGI541 implementation of the
+compatibility symbol required by the imported VPPInfra string helpers.
+It replaces the VPP runtime dependency chain that would otherwise pull
+in error formatting, dynamic vectors, the VPP memory allocator, and OS
+runtime support.
+
+This file is original NGI541 code and is not copied from the upstream
+VPP `string.c` implementation.

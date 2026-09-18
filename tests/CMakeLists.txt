@@ -13,3 +13,7 @@ add_test(
     NAME core.compile
     COMMAND ngi541_core_compile_test
 )
+
+if(NGI541_BUILD_ENGINE)
+    add_subdirectory(engine)
+endif()

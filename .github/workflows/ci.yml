@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake \
+            -S . \
+            -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: |
+          ctest \
+            --test-dir build \
+            --output-on-failure \
+            -V

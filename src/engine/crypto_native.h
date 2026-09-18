@@ -7,8 +7,10 @@
 #ifndef __crypto_native_h__
 #define __crypto_native_h__
 
+#include "engine/crypto_types.h"
+
 typedef void (crypto_native_key_fn_t) (vnet_crypto_key_op_t kop, vnet_crypto_key_handler_args_t a);
-typedef int (crypto_native_variant_probe_t) ();
+typedef int (crypto_native_variant_probe_t) (void);
 
 typedef struct crypto_native_op_handler
 {
