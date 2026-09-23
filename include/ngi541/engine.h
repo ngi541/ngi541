@@ -12,11 +12,15 @@
 NGI541_BEGIN_DECLS
 
 /*
- * Initializes the NGI541 execution engine and selects the best
- * available native implementations for the current environment.
+ * Initializes the NGI541 execution engine.
  *
- * The function is idempotent. It must complete successfully before
- * cryptographic execution functions are used.
+ * Initialization selects the available native implementations for
+ * the current execution environment.
+ *
+ * The function may be called more than once. Repeated successful
+ * initialization returns NGI541_STATUS_OK.
+ *
+ * Cryptographic execution functions require successful initialization.
  */
 NGI541_API ngi541_status_t
 ngi541_engine_init (void);
