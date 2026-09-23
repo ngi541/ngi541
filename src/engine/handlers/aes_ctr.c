@@ -321,7 +321,7 @@ aes_ctr_sha2_probe ()
   }                                                                                                \
   static void aes_ctr_key_exp_##b (ngi541_crypto_key_op_t kop, ngi541_crypto_key_handler_args_t arg)   \
   {                                                                                                \
-    return aes_ctr_key_exp (kop, arg.per_thread_key_data, arg.key, AES_KEY_##b);                   \
+    return aes_ctr_key_exp (kop, arg.key_data, arg.key, AES_KEY_##b);                   \
   }                                                                                                \
   NGI541_NATIVE_OP_HANDLER (aes_##b##_ctr_enc) = {                                                 \
     .op_id = NGI541_CRYPTO_OP_AES_##b##_CTR_ENC,                                                     \
@@ -386,7 +386,7 @@ _ (256)
   static void aes_ctr_key_exp_##a##_hmac_sha##b (ngi541_crypto_key_op_t kop,                         \
 						 ngi541_crypto_key_handler_args_t arg)               \
   {                                                                                                \
-    aes_ctr_hmac_key_exp (kop, arg.per_thread_key_data, arg.key, arg.key_length, d, AES_KEY_##a,   \
+    aes_ctr_hmac_key_exp (kop, arg.key_data, arg.key, arg.key_length, d, AES_KEY_##a,   \
 			  CLIB_SHA2_##b);                                                          \
   }                                                                                                \
                                                                                                    \

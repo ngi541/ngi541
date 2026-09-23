@@ -262,7 +262,7 @@ aes_cbc_hmac_key_exp (ngi541_crypto_key_op_t kop, aes_cbc_sha2_hmac_key_data_t *
                                                                                                    \
   static void aes_cbc_key_exp_##x (ngi541_crypto_key_op_t kop, ngi541_crypto_key_handler_args_t arg)   \
   {                                                                                                \
-    aes_cbc_key_exp (kop, arg.per_thread_key_data, arg.key, AES_KEY_##x);                          \
+    aes_cbc_key_exp (kop, arg.key_data, arg.key, AES_KEY_##x);                          \
   }                                                                                                \
                                                                                                    \
   NGI541_NATIVE_KEY_HANDLER (aes_##x##_cbc) = {                                                    \
@@ -303,7 +303,7 @@ _ (256)
   static void aes_cbc_key_exp_##a##_hmac_sha##b (ngi541_crypto_key_op_t kop,                         \
 						 ngi541_crypto_key_handler_args_t arg)               \
   {                                                                                                \
-    aes_cbc_hmac_key_exp (kop, arg.per_thread_key_data, arg.key, arg.key_length, d, AES_KEY_##a,   \
+    aes_cbc_hmac_key_exp (kop, arg.key_data, arg.key, arg.key_length, d, AES_KEY_##a,   \
 			  CLIB_SHA2_##b);                                                          \
   }                                                                                                \
                                                                                                    \

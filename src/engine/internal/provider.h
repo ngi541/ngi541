@@ -32,10 +32,6 @@ typedef struct ngi541_provider
 
   u16 key_data_size[NGI541_CRYPTO_N_ALGS];
 
-  u32 per_thread_data_size;
-  u32 num_threads;
-  void *per_thread_data;
-
   ngi541_provider_init_fn_t *init;
   ngi541_crypto_key_fn_t *key_handler;
   ngi541_provider_op_handler_t *op_handlers;

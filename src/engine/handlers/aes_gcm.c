@@ -109,7 +109,7 @@ aes_gcm_key_exp (ngi541_crypto_key_op_t kop, aes_gcm_key_data_t *key_data, const
   }                                                                                                \
   static void aes_gcm_key_exp_##x (ngi541_crypto_key_op_t kop, ngi541_crypto_key_handler_args_t a)     \
   {                                                                                                \
-    return aes_gcm_key_exp (kop, a.per_thread_key_data, a.key, AES_KEY_##x);                       \
+    return aes_gcm_key_exp (kop, a.key_data, a.key, AES_KEY_##x);                       \
   }
 
 _ (128)

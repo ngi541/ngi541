@@ -158,15 +158,7 @@ typedef struct
     u8 *digest;
   };
 
-  union
-  {
-    /* valid if NGI541_CRYPTO_OP_FLAG_IS_KEY_DATA is set */
-    uword key_data;
-
-    /* valid if NGI541_CRYPTO_OP_FLAG_IS_KEY_DATA is NOT set */
-    u32 key_index;
-  };
-  u32 user_data;
+  void *key_data;
 
   union
   {
@@ -181,7 +173,6 @@ typedef struct
   u8 flags;
 #define NGI541_CRYPTO_OP_FLAG_HMAC_CHECK	    (1 << 0)
 #define NGI541_CRYPTO_OP_FLAG_CHAINED_BUFFERS (1 << 1)
-#define NGI541_CRYPTO_OP_FLAG_IS_KEY_DATA	    (1 << 2)
 
   union
   {
@@ -202,8 +193,7 @@ STATIC_ASSERT_SIZEOF (ngi541_crypto_op_t, CLIB_CACHE_LINE_BYTES);
 typedef struct
 {
   ngi541_crypto_alg_t alg;
-  void *per_thread_key_data;
-  void *per_thread_ctx;
+  void *key_data;
   const u8 *key;
   u16 key_length;
 } ngi541_crypto_key_handler_args_t;

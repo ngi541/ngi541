@@ -102,7 +102,7 @@ ngi541_native_init (ngi541_provider_t *provider)
 
 ngi541_provider_t ngi541_native_provider = {
   .name = "native",
-  .description = "Native ISA Optimized Crypto",
+  .description = "NGI541 Native ISA-Optimized Crypto Provider",
   .priority = 100,
   .init = ngi541_native_init,
   .key_handler = ngi541_native_key_handler,

@@ -72,7 +72,7 @@ sha2_key_exp (ngi541_crypto_key_op_t kop, clib_sha2_hmac_key_data_t *key_data, c
                                                                                                    \
   static void sha2_key_exp_##b (ngi541_crypto_key_op_t kop, ngi541_crypto_key_handler_args_t arg)      \
   {                                                                                                \
-    sha2_key_exp (kop, arg.per_thread_key_data, arg.key, arg.key_length, CLIB_SHA2_##b);           \
+    sha2_key_exp (kop, arg.key_data, arg.key, arg.key_length, CLIB_SHA2_##b);           \
   }                                                                                                \
                                                                                                    \
   NGI541_NATIVE_OP_HANDLER (ngi541_native_hash_sha##b) = {                                         \
