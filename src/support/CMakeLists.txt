@@ -15,3 +15,9 @@ target_include_directories(
     PUBLIC
         ${PROJECT_SOURCE_DIR}/src/support
 )
+
+set_target_properties(
+    ngi541_support
+    PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+)

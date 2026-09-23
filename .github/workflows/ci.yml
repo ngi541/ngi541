@@ -8,13 +8,23 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
-    name: Build and test
+  build-test:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Configure compiler
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> "$GITHUB_ENV"
+          else
+            echo "CC=clang" >> "$GITHUB_ENV"
+          fi
 
       - name: Configure
         run: |
@@ -29,8 +39,4 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Test
-        run: |
-          ctest \
-            --test-dir build \
-            --output-on-failure \
-            -V
+        run: ctest --test-dir build --output-on-failure

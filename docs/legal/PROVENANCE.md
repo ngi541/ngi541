@@ -198,3 +198,18 @@ runtime support.
 
 This file is original NGI541 code and is not copied from the upstream
 VPP `string.c` implementation.
+
+## Standalone extraction boundary
+
+The NGI541 production engine is derived from the FD.io VPP native
+crypto implementation at the recorded historical baseline.
+
+The VPP `vnet/crypto` runtime/framework is not carried forward as a
+production dependency. NGI541 retains only the engine contract,
+native handlers, required crypto primitives, and selected supporting
+VPPInfra headers.
+
+Runtime/framework code from the original VPP implementation may be
+consulted as historical reference, but future validation interfaces
+are developed independently around standardized cryptographic
+validation requirements.

@@ -39,19 +39,25 @@ The initial implementation target is AES-GCM.
 
 ## Architecture
 
-NGI541 is intended to expose a small standalone API while dispatching work to
-architecture-specific optimized implementations.
+    src/engine
+        ↓
+    src/core
+        ↓
+    src/support
 
-Initial CPU target:
+`src/engine` contains the native engine contract, registration logic,
+ISA selection, and crypto handlers.
 
-- x86-64
-- AES-NI
-- PCLMULQDQ
-- AVX2
-- VAES
-- VPCLMULQDQ
+`src/core` contains the AES, GHASH, SHA-2, and SIMD-oriented
+cryptographic primitives.
 
-ARM64 support is planned for a later stage.
+`src/support` contains the minimal compatibility and low-level support
+required by the standalone implementation.
+
+NGI541 deliberately does not reproduce the VPP crypto framework or
+VLIB runtime. External validation and execution interfaces will be
+defined from standardized validation requirements rather than by
+porting the historical VPP runtime.
 
 ## Source provenance
 
@@ -82,6 +88,25 @@ See [`LICENSE`](LICENSE).
 
 ## Project status
 
-NGI541 is currently in private early-stage development.
+NGI541 currently provides a standalone extraction of the FD.io VPP
+native cryptographic engine.
 
-No stable API or production release is available yet.
+The current milestone includes:
+
+- standalone AES/GHASH/SHA crypto primitives;
+- standalone native crypto engine registration and ISA selection;
+- static library build (`libngi541_engine.a`);
+- shared module build (`libngi541_engine.so` / `.dylib`);
+- dynamic loading through the exported `__vnet_crypto_engine` ABI;
+- compile, static-engine smoke, and dynamic-engine smoke tests.
+
+The VPP crypto framework and VLIB runtime are intentionally not part
+of the standalone production engine.
+
+Current tests validate compilation, module loading, engine
+initialization, CPU feature probing, and native handler registration.
+They do not yet constitute cryptographic algorithm validation.
+
+The next milestone is integration with an external standardized
+cryptographic validation framework, starting with investigation of
+NIST ACVP and libacvp.
