@@ -25,14 +25,8 @@ add_test(
 
 add_executable(
     ngi541_engine_dlopen_smoke
-    engine_dlopen_smoke.c
-)
 
-target_include_directories(
-    ngi541_engine_dlopen_smoke
-    PRIVATE
-        ${PROJECT_SOURCE_DIR}/src
-        ${PROJECT_SOURCE_DIR}/src/support
+    engine_dlopen_smoke.c
 )
 
 target_link_libraries(

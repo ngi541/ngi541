@@ -19,27 +19,27 @@ typedef struct aes_cbc_sha2_hmac_key_data
   aes_cbc_key_data_t cbc_key_data;
 } aes_cbc_sha2_hmac_key_data_t;
 
-#define CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE 256
+#define NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE 256
 
 static_always_inline u32
-aes_ops_enc_aes_cbc_hmac (vnet_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks,
+aes_ops_enc_aes_cbc_hmac (ngi541_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks,
 			  clib_sha2_type_t type)
 {
   u32 i, n_left = n_ops;
-  aes_cbc_key_data_t *keys_data[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  u8 *plaintext[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  uword oplen[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  u8 *iv[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  u8 *ciphertext[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  clib_sha2_hmac_ctx_t ctx[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE];
-  vnet_crypto_op_t *h_ops = ops[0];
+  aes_cbc_key_data_t *keys_data[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  u8 *plaintext[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  uword oplen[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  u8 *iv[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  u8 *ciphertext[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  clib_sha2_hmac_ctx_t ctx[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE];
+  ngi541_crypto_op_t *h_ops = ops[0];
   u8 buffer[64];
   aes_cbc_sha2_hmac_key_data_t *cbc_hmac_key_data;
 
   while (n_left)
     {
       i = 0;
-      while (n_left && i < CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE)
+      while (n_left && i < NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE)
 	{
 	  cbc_hmac_key_data = (aes_cbc_sha2_hmac_key_data_t *) ops[0]->key_data;
 	  clib_sha2_hmac_init (&ctx[i], type, &cbc_hmac_key_data->hmac_key_data);
@@ -48,7 +48,7 @@ aes_ops_enc_aes_cbc_hmac (vnet_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks,
 	  ciphertext[i] = ops[0]->dst;
 	  oplen[i] = ops[0]->len;
 	  iv[i] = ops[0]->iv;
-	  ops[0]->status = VNET_CRYPTO_OP_STATUS_COMPLETED;
+	  ops[0]->status = NGI541_CRYPTO_OP_STATUS_COMPLETED;
 
 	  ops++;
 	  n_left--;
@@ -67,11 +67,11 @@ aes_ops_enc_aes_cbc_hmac (vnet_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks,
 }
 
 static_always_inline u32
-aes_ops_hmac_dec_aes_cbc (vnet_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks,
+aes_ops_hmac_dec_aes_cbc (ngi541_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks,
 			  clib_sha2_type_t type)
 {
   int rounds = AES_KEY_ROUNDS (ks);
-  vnet_crypto_op_t *op = ops[0];
+  ngi541_crypto_op_t *op = ops[0];
   aes_cbc_sha2_hmac_key_data_t *cbc_hmac_key_data = (aes_cbc_sha2_hmac_key_data_t *) op->key_data;
   aes_cbc_key_data_t *kd = &cbc_hmac_key_data->cbc_key_data;
   clib_sha2_hmac_ctx_t ctx;
@@ -88,7 +88,7 @@ decrypt:
   if ((memcmp (op->digest, buffer, op->digest_len)))
     {
       n_fail++;
-      op->status = VNET_CRYPTO_OP_STATUS_FAIL_BAD_HMAC;
+      op->status = NGI541_CRYPTO_OP_STATUS_FAIL_BAD_HMAC;
     }
   else
     {
@@ -102,7 +102,7 @@ decrypt:
       aes_cbc_dec (kd->decrypt_key, (u8x16u *) op->src, (u8x16u *) op->dst,
 		   (u8x16u *) op->iv, op->len, rounds);
 #endif
-      op->status = VNET_CRYPTO_OP_STATUS_COMPLETED;
+      op->status = NGI541_CRYPTO_OP_STATUS_COMPLETED;
     }
 
   if (--n_left)
@@ -117,20 +117,20 @@ decrypt:
 }
 
 static_always_inline u32
-aes_ops_enc_aes_cbc (vnet_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks)
+aes_ops_enc_aes_cbc (ngi541_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks)
 {
   u32 i, n_left = n_ops;
-  aes_cbc_key_data_t *keys_data[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  u8 *plaintext[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  uword oplen[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  u8 *iv[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
-  u8 *ciphertext[CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE] = {};
+  aes_cbc_key_data_t *keys_data[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  u8 *plaintext[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  uword oplen[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  u8 *iv[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
+  u8 *ciphertext[NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE] = {};
   aes_cbc_key_data_t *cbc_key_data;
 
   while (n_left)
     {
       i = 0;
-      while (n_left && i < CRYPTO_NATIVE_AES_CBC_ENC_VEC_SIZE)
+      while (n_left && i < NGI541_NATIVE_AES_CBC_MAX_BATCH_SIZE)
 	{
 	  cbc_key_data = (aes_cbc_key_data_t *) ops[0]->key_data;
 	  keys_data[i] = cbc_key_data;
@@ -138,7 +138,7 @@ aes_ops_enc_aes_cbc (vnet_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks)
 	  ciphertext[i] = ops[0]->dst;
 	  oplen[i] = ops[0]->len;
 	  iv[i] = ops[0]->iv;
-	  ops[0]->status = VNET_CRYPTO_OP_STATUS_COMPLETED;
+	  ops[0]->status = NGI541_CRYPTO_OP_STATUS_COMPLETED;
 
 	  ops++;
 	  n_left--;
@@ -150,10 +150,10 @@ aes_ops_enc_aes_cbc (vnet_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks)
 }
 
 static_always_inline u32
-aes_ops_dec_aes_cbc (vnet_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks)
+aes_ops_dec_aes_cbc (ngi541_crypto_op_t *ops[], u32 n_ops, aes_key_size_t ks)
 {
   int rounds = AES_KEY_ROUNDS (ks);
-  vnet_crypto_op_t *op = ops[0];
+  ngi541_crypto_op_t *op = ops[0];
   aes_cbc_key_data_t *kd = (aes_cbc_key_data_t *) op->key_data;
   u32 n_left = n_ops;
 
@@ -170,7 +170,7 @@ decrypt:
   aes_cbc_dec (kd->decrypt_key, (u8x16u *) op->src, (u8x16u *) op->dst,
 	       (u8x16u *) op->iv, op->len, rounds);
 #endif
-  op->status = VNET_CRYPTO_OP_STATUS_COMPLETED;
+  op->status = NGI541_CRYPTO_OP_STATUS_COMPLETED;
 
   if (--n_left)
     {
@@ -216,21 +216,21 @@ aes_cbc_sha2_probe ()
 }
 
 static void
-aes_cbc_key_exp (vnet_crypto_key_op_t kop, aes_cbc_key_data_t *key_data, const u8 *data,
+aes_cbc_key_exp (ngi541_crypto_key_op_t kop, aes_cbc_key_data_t *key_data, const u8 *data,
 		 aes_key_size_t ks)
 {
-  if (kop == VNET_CRYPTO_KEY_OP_ADD || kop == VNET_CRYPTO_KEY_OP_MODIFY)
+  if (kop == NGI541_CRYPTO_KEY_OP_ADD || kop == NGI541_CRYPTO_KEY_OP_MODIFY)
     {
       clib_aes_cbc_key_expand (key_data, data, ks);
     }
 }
 
 static void
-aes_cbc_hmac_key_exp (vnet_crypto_key_op_t kop, aes_cbc_sha2_hmac_key_data_t *key_data,
+aes_cbc_hmac_key_exp (ngi541_crypto_key_op_t kop, aes_cbc_sha2_hmac_key_data_t *key_data,
 		      const u8 *data, u16 hmac_length, u16 cbc_length, aes_key_size_t ks,
 		      clib_sha2_type_t type)
 {
-  if (kop == VNET_CRYPTO_KEY_OP_ADD || kop == VNET_CRYPTO_KEY_OP_MODIFY)
+  if (kop == NGI541_CRYPTO_KEY_OP_ADD || kop == NGI541_CRYPTO_KEY_OP_MODIFY)
     {
       clib_aes_cbc_key_expand (&key_data->cbc_key_data, data, ks);
       clib_sha2_hmac_key_data (type, data + cbc_length, hmac_length, &key_data->hmac_key_data);
@@ -238,38 +238,38 @@ aes_cbc_hmac_key_exp (vnet_crypto_key_op_t kop, aes_cbc_sha2_hmac_key_data_t *ke
 }
 
 #define _(x)                                                                                       \
-  static u32 aes_ops_enc_aes_cbc_##x (vnet_crypto_op_t *ops[], u32 n_ops)                          \
+  static u32 aes_ops_enc_aes_cbc_##x (ngi541_crypto_op_t *ops[], u32 n_ops)                          \
   {                                                                                                \
     return aes_ops_enc_aes_cbc (ops, n_ops, AES_KEY_##x);                                          \
   }                                                                                                \
                                                                                                    \
-  CRYPTO_NATIVE_OP_HANDLER (aes_##x##_cbc_enc) = {                                                 \
-    .op_id = VNET_CRYPTO_OP_AES_##x##_CBC_ENC,                                                     \
+  NGI541_NATIVE_OP_HANDLER (aes_##x##_cbc_enc) = {                                                 \
+    .op_id = NGI541_CRYPTO_OP_AES_##x##_CBC_ENC,                                                     \
     .fn = aes_ops_enc_aes_cbc_##x,                                                                 \
     .probe = aes_cbc_cpu_probe,                                                                    \
   };                                                                                               \
                                                                                                    \
-  static u32 aes_ops_dec_aes_cbc_##x (vnet_crypto_op_t *ops[], u32 n_ops)                          \
+  static u32 aes_ops_dec_aes_cbc_##x (ngi541_crypto_op_t *ops[], u32 n_ops)                          \
   {                                                                                                \
     return aes_ops_dec_aes_cbc (ops, n_ops, AES_KEY_##x);                                          \
   }                                                                                                \
                                                                                                    \
-  CRYPTO_NATIVE_OP_HANDLER (aes_##x##_cbc_dec) = {                                                 \
-    .op_id = VNET_CRYPTO_OP_AES_##x##_CBC_DEC,                                                     \
+  NGI541_NATIVE_OP_HANDLER (aes_##x##_cbc_dec) = {                                                 \
+    .op_id = NGI541_CRYPTO_OP_AES_##x##_CBC_DEC,                                                     \
     .fn = aes_ops_dec_aes_cbc_##x,                                                                 \
     .probe = aes_cbc_cpu_probe,                                                                    \
   };                                                                                               \
                                                                                                    \
-  static void aes_cbc_key_exp_##x (vnet_crypto_key_op_t kop, vnet_crypto_key_handler_args_t arg)   \
+  static void aes_cbc_key_exp_##x (ngi541_crypto_key_op_t kop, ngi541_crypto_key_handler_args_t arg)   \
   {                                                                                                \
     aes_cbc_key_exp (kop, arg.per_thread_key_data, arg.key, AES_KEY_##x);                          \
   }                                                                                                \
                                                                                                    \
-  CRYPTO_NATIVE_KEY_HANDLER (aes_##x##_cbc) = {                                                    \
-    .alg_id = VNET_CRYPTO_ALG_AES_##x##_CBC,                                                       \
+  NGI541_NATIVE_KEY_HANDLER (aes_##x##_cbc) = {                                                    \
+    .alg_id = NGI541_CRYPTO_ALG_AES_##x##_CBC,                                                       \
     .key_fn = aes_cbc_key_exp_##x,                                                                 \
     .probe = aes_cbc_cpu_probe,                                                                    \
-    .key_data_sz = sizeof (aes_cbc_key_data_t),                                                    \
+    .key_data_size = sizeof (aes_cbc_key_data_t),                                                    \
   };
 
 _ (128)
@@ -279,39 +279,39 @@ _ (256)
 #undef _
 
 #define _(a, b, c, d)                                                                              \
-  static u32 crypto_native_ops_enc_aes_cbc_##a##_hmac_sha##b (vnet_crypto_op_t *ops[], u32 n_ops)  \
+  static u32 ngi541_native_ops_enc_aes_cbc_##a##_hmac_sha##b (ngi541_crypto_op_t *ops[], u32 n_ops)  \
   {                                                                                                \
     return aes_ops_enc_aes_cbc_hmac (ops, n_ops, AES_KEY_##a, CLIB_SHA2_##b);                      \
   }                                                                                                \
                                                                                                    \
-  static u32 crypto_native_ops_dec_aes_cbc_##a##_hmac_sha##b (vnet_crypto_op_t *ops[], u32 n_ops)  \
+  static u32 ngi541_native_ops_dec_aes_cbc_##a##_hmac_sha##b (ngi541_crypto_op_t *ops[], u32 n_ops)  \
   {                                                                                                \
     return aes_ops_hmac_dec_aes_cbc (ops, n_ops, AES_KEY_##a, CLIB_SHA2_##b);                      \
   }                                                                                                \
                                                                                                    \
-  CRYPTO_NATIVE_OP_HANDLER (aes_##a##_cbc_hmac_sha##b##_enc) = {                                   \
-    .op_id = VNET_CRYPTO_OP_AES_##a##_CBC_SHA##b##_TAG##c##_ENC,                                   \
-    .fn = crypto_native_ops_enc_aes_cbc_##a##_hmac_sha##b,                                         \
+  NGI541_NATIVE_OP_HANDLER (aes_##a##_cbc_hmac_sha##b##_enc) = {                                   \
+    .op_id = NGI541_CRYPTO_OP_AES_##a##_CBC_SHA##b##_TAG##c##_ENC,                                   \
+    .fn = ngi541_native_ops_enc_aes_cbc_##a##_hmac_sha##b,                                         \
     .probe = aes_cbc_sha2_probe,                                                                   \
   };                                                                                               \
-  CRYPTO_NATIVE_OP_HANDLER (aes_##a##_cbc_hmac_sha##b##_dec) = {                                   \
-    .op_id = VNET_CRYPTO_OP_AES_##a##_CBC_SHA##b##_TAG##c##_DEC,                                   \
-    .fn = crypto_native_ops_dec_aes_cbc_##a##_hmac_sha##b,                                         \
+  NGI541_NATIVE_OP_HANDLER (aes_##a##_cbc_hmac_sha##b##_dec) = {                                   \
+    .op_id = NGI541_CRYPTO_OP_AES_##a##_CBC_SHA##b##_TAG##c##_DEC,                                   \
+    .fn = ngi541_native_ops_dec_aes_cbc_##a##_hmac_sha##b,                                         \
     .probe = aes_cbc_sha2_probe,                                                                   \
   };                                                                                               \
                                                                                                    \
-  static void aes_cbc_key_exp_##a##_hmac_sha##b (vnet_crypto_key_op_t kop,                         \
-						 vnet_crypto_key_handler_args_t arg)               \
+  static void aes_cbc_key_exp_##a##_hmac_sha##b (ngi541_crypto_key_op_t kop,                         \
+						 ngi541_crypto_key_handler_args_t arg)               \
   {                                                                                                \
     aes_cbc_hmac_key_exp (kop, arg.per_thread_key_data, arg.key, arg.key_length, d, AES_KEY_##a,   \
 			  CLIB_SHA2_##b);                                                          \
   }                                                                                                \
                                                                                                    \
-  CRYPTO_NATIVE_KEY_HANDLER (aes_##a##_cbc_hmac_sha##b) = {                                        \
-    .alg_id = VNET_CRYPTO_ALG_AES_##a##_CBC_SHA##b##_TAG##c,                                       \
+  NGI541_NATIVE_KEY_HANDLER (aes_##a##_cbc_hmac_sha##b) = {                                        \
+    .alg_id = NGI541_CRYPTO_ALG_AES_##a##_CBC_SHA##b##_TAG##c,                                       \
     .key_fn = aes_cbc_key_exp_##a##_hmac_sha##b,                                                   \
     .probe = aes_cbc_cpu_probe,                                                                    \
-    .key_data_sz = sizeof (aes_cbc_sha2_hmac_key_data_t),                                          \
+    .key_data_size = sizeof (aes_cbc_sha2_hmac_key_data_t),                                          \
   };
 
 _ (128, 224, 14, 16)

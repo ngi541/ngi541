@@ -9,15 +9,15 @@
 
 #include "support/compat/cpu.h"
 
-#include "engine/crypto_types.h"
-#include "engine/crypto_native.h"
+#include "engine/internal/crypto_types.h"
+#include "engine/internal/native.h"
 #include "core/sha/sha2.h"
 
 static_always_inline u32
-crypto_native_ops_hmac_sha2 (vnet_crypto_op_t *ops[], u32 n_ops, vnet_crypto_op_chunk_t *chunks,
+ngi541_native_ops_hmac_sha2 (ngi541_crypto_op_t *ops[], u32 n_ops, ngi541_crypto_op_chunk_t *chunks,
 			     clib_sha2_type_t type)
 {
-  vnet_crypto_op_t *op = ops[0];
+  ngi541_crypto_op_t *op = ops[0];
   u32 n_left = n_ops;
   clib_sha2_hmac_ctx_t ctx;
   u8 buffer[64];
@@ -26,9 +26,9 @@ crypto_native_ops_hmac_sha2 (vnet_crypto_op_t *ops[], u32 n_ops, vnet_crypto_op_
   for (; n_left; n_left--, op++)
     {
       clib_sha2_hmac_init (&ctx, type, (clib_sha2_hmac_key_data_t *) op->key_data);
-      if (op->flags & VNET_CRYPTO_OP_FLAG_CHAINED_BUFFERS)
+      if (op->flags & NGI541_CRYPTO_OP_FLAG_CHAINED_BUFFERS)
 	{
-	  vnet_crypto_op_chunk_t *chp = chunks + op->integ_chunk_index;
+	  ngi541_crypto_op_chunk_t *chp = chunks + op->integ_chunk_index;
 	  for (int j = 0; j < op->integ_n_chunks; j++, chp++)
 	    clib_sha2_hmac_update (&ctx, chp->src, chp->len);
 	}
@@ -40,12 +40,12 @@ crypto_native_ops_hmac_sha2 (vnet_crypto_op_t *ops[], u32 n_ops, vnet_crypto_op_
       if (op->digest_len)
 	{
 	  sz = op->digest_len;
-	  if (op->flags & VNET_CRYPTO_OP_FLAG_HMAC_CHECK)
+	  if (op->flags & NGI541_CRYPTO_OP_FLAG_HMAC_CHECK)
 	    {
 	      if ((memcmp (op->digest, buffer, sz)))
 		{
 		  n_fail++;
-		  op->status = VNET_CRYPTO_OP_STATUS_FAIL_BAD_HMAC;
+		  op->status = NGI541_CRYPTO_OP_STATUS_FAIL_BAD_HMAC;
 		  continue;
 		}
 	    }
@@ -55,12 +55,12 @@ crypto_native_ops_hmac_sha2 (vnet_crypto_op_t *ops[], u32 n_ops, vnet_crypto_op_
       else
 	{
 	  sz = clib_sha2_variants[type].digest_size;
-	  if (op->flags & VNET_CRYPTO_OP_FLAG_HMAC_CHECK)
+	  if (op->flags & NGI541_CRYPTO_OP_FLAG_HMAC_CHECK)
 	    {
 	      if ((memcmp (op->digest, buffer, sz)))
 		{
 		  n_fail++;
-		  op->status = VNET_CRYPTO_OP_STATUS_FAIL_BAD_HMAC;
+		  op->status = NGI541_CRYPTO_OP_STATUS_FAIL_BAD_HMAC;
 		  continue;
 		}
 	    }
@@ -68,7 +68,7 @@ crypto_native_ops_hmac_sha2 (vnet_crypto_op_t *ops[], u32 n_ops, vnet_crypto_op_
 	    clib_memcpy_fast (op->digest, buffer, sz);
 	}
 
-      op->status = VNET_CRYPTO_OP_STATUS_COMPLETED;
+      op->status = NGI541_CRYPTO_OP_STATUS_COMPLETED;
     }
 
   return n_ops - n_fail;

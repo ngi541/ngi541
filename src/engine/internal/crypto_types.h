@@ -5,8 +5,8 @@
  * Modified for NGI541: source layout and include paths.
  */
 
-#ifndef included_ngi541_crypto_types_h
-#define included_ngi541_crypto_types_h
+#ifndef NGI541_INTERNAL_CRYPTO_TYPES_H
+#define NGI541_INTERNAL_CRYPTO_TYPES_H
 
 #include <compat/assert.h>
 #include <compat/base.h>
@@ -14,7 +14,7 @@
 #include <vppinfra/string.h>
 
 /* CRYPTO_ID, PRETTY_NAME, ARGS*/
-#define foreach_crypto_cipher_alg                                             \
+#define NGI541_FOREACH_CRYPTO_CIPHER_ALG                                             \
   _ (DES_CBC, "des-cbc", .key_length = 7)                                     \
   _ (3DES_CBC, "3des-cbc", .key_length = 24)                                  \
   _ (AES_128_CBC, "aes-128-cbc", .key_length = 16)                            \
@@ -24,7 +24,7 @@
   _ (AES_192_CTR, "aes-192-ctr", .key_length = 24)                            \
   _ (AES_256_CTR, "aes-256-ctr", .key_length = 32)
 
-#define foreach_crypto_hash_alg                                               \
+#define NGI541_FOREACH_CRYPTO_HASH_ALG                                               \
   _ (MD5, "md5")                                                              \
   _ (SHA1, "sha-1")                                                           \
   _ (SHA224, "sha-224")                                                       \
@@ -32,7 +32,7 @@
   _ (SHA384, "sha-384")                                                       \
   _ (SHA512, "sha-512")
 
-#define foreach_crypto_op_type                                                \
+#define NGI541_FOREACH_CRYPTO_OP_TYPE                                                \
   _ (ENCRYPT, "encrypt")                                                      \
   _ (DECRYPT, "decrypt")                                                      \
   _ (HMAC, "hmac")                                                            \
@@ -40,13 +40,13 @@
 
 typedef enum
 {
-#define _(n, s) VNET_CRYPTO_OP_TYPE_##n,
-  foreach_crypto_op_type
+#define _(n, s) NGI541_CRYPTO_OP_TYPE_##n,
+  NGI541_FOREACH_CRYPTO_OP_TYPE
 #undef _
-    VNET_CRYPTO_OP_N_TYPES,
-} vnet_crypto_op_type_t;
+    NGI541_CRYPTO_OP_N_TYPES,
+} ngi541_crypto_op_type_t;
 
-#define foreach_crypto_op_status \
+#define NGI541_FOREACH_CRYPTO_OP_STATUS \
   _(IDLE, "idle") \
   _(PENDING, "pending") \
   _(WORK_IN_PROGRESS, "work-in-progress") \
@@ -56,7 +56,7 @@ typedef enum
   _(FAIL_ENGINE_ERR, "engine-error")
 
 
-#define foreach_crypto_aead_alg                                               \
+#define NGI541_FOREACH_CRYPTO_AEAD_ALG                                               \
   _ (AES_128_GCM, "aes-128-gcm", .is_aead = 1, .key_length = 16)             \
   _ (AES_192_GCM, "aes-192-gcm", .is_aead = 1, .key_length = 24)             \
   _ (AES_256_GCM, "aes-256-gcm", .is_aead = 1, .key_length = 32)             \
@@ -66,7 +66,7 @@ typedef enum
   _ (CHACHA20_POLY1305, "chacha20-poly1305", .is_aead = 1, .key_length = 32)
 
 /* CRYPTO_ID, PRETTY_NAME, KEY_LENGTH_IN_BYTES, TAG_LEN, AAD_LEN */
-#define foreach_crypto_aead_variant_alg                                               \
+#define NGI541_FOREACH_CRYPTO_AEAD_VARIANT_ALG                                               \
   _ (AES_128_GCM, "aes-128-gcm-aad8", 16, 16, 8)                              \
   _ (AES_128_GCM, "aes-128-gcm-aad12", 16, 16, 12)                            \
   _ (AES_192_GCM, "aes-192-gcm-aad8", 24, 16, 8)                              \
@@ -84,7 +84,7 @@ typedef enum
   _ (CHACHA20_POLY1305, "chacha20-poly1305-aad0", 32, 16, 0)
 
 /* CRYPTO_ID, INTEG_ID, PRETTY_NAME, KEY_LENGTH_IN_BYTES, DIGEST_LEN */
-#define foreach_crypto_link_alg                                               \
+#define NGI541_FOREACH_CRYPTO_LINK_ALG                                               \
   _ (3DES_CBC, MD5, "3des-cbc-hmac-md5", 24, 12)                              \
   _ (AES_128_CBC, MD5, "aes-128-cbc-hmac-md5", 16, 12)                        \
   _ (AES_192_CBC, MD5, "aes-192-cbc-hmac-md5", 24, 12)                        \
@@ -124,73 +124,73 @@ typedef enum
 
 typedef enum
 {
-  VNET_CRYPTO_KEY_OP_ADD,
-  VNET_CRYPTO_KEY_OP_DEL,
-  VNET_CRYPTO_KEY_OP_MODIFY,
-} vnet_crypto_key_op_t;
+  NGI541_CRYPTO_KEY_OP_ADD,
+  NGI541_CRYPTO_KEY_OP_DEL,
+  NGI541_CRYPTO_KEY_OP_MODIFY,
+} ngi541_crypto_key_op_t;
 
 typedef enum
 {
-#define _(n, s) VNET_CRYPTO_OP_STATUS_##n,
-  foreach_crypto_op_status
+#define _(n, s) NGI541_CRYPTO_OP_STATUS_##n,
+  NGI541_FOREACH_CRYPTO_OP_STATUS
 #undef _
-    VNET_CRYPTO_OP_N_STATUS,
-} vnet_crypto_op_status_t;
+    NGI541_CRYPTO_OP_N_STATUS,
+} ngi541_crypto_op_status_t;
 
 typedef enum
 {
-  VNET_CRYPTO_ALG_NONE = 0,
-#define _(n, s, ...) VNET_CRYPTO_ALG_##n,
-  foreach_crypto_cipher_alg foreach_crypto_aead_alg
+  NGI541_CRYPTO_ALG_NONE = 0,
+#define _(n, s, ...) NGI541_CRYPTO_ALG_##n,
+  NGI541_FOREACH_CRYPTO_CIPHER_ALG NGI541_FOREACH_CRYPTO_AEAD_ALG
 #undef _
-#define _(n, s) VNET_CRYPTO_ALG_HASH_##n, VNET_CRYPTO_ALG_HMAC_##n,
-    foreach_crypto_hash_alg
+#define _(n, s) NGI541_CRYPTO_ALG_HASH_##n, NGI541_CRYPTO_ALG_HMAC_##n,
+    NGI541_FOREACH_CRYPTO_HASH_ALG
 #undef _
 #define _(n, s, k, t, a) \
-  VNET_CRYPTO_ALG_##n##_TAG##t##_AAD##a,
-      foreach_crypto_aead_variant_alg
+  NGI541_CRYPTO_ALG_##n##_TAG##t##_AAD##a,
+      NGI541_FOREACH_CRYPTO_AEAD_VARIANT_ALG
 #undef _
 #define _(c, h, s, k ,d) \
-  VNET_CRYPTO_ALG_##c##_##h##_TAG##d,
-	foreach_crypto_link_alg
+  NGI541_CRYPTO_ALG_##c##_##h##_TAG##d,
+	NGI541_FOREACH_CRYPTO_LINK_ALG
 #undef _
-	  VNET_CRYPTO_N_ALGS,
-} vnet_crypto_alg_t;
+	  NGI541_CRYPTO_N_ALGS,
+} ngi541_crypto_alg_t;
 
 typedef enum
 {
-  VNET_CRYPTO_OP_NONE = 0,
-#define _(n, s, ...) VNET_CRYPTO_OP_##n##_ENC, VNET_CRYPTO_OP_##n##_DEC,
-  foreach_crypto_cipher_alg foreach_crypto_aead_alg
+  NGI541_CRYPTO_OP_NONE = 0,
+#define _(n, s, ...) NGI541_CRYPTO_OP_##n##_ENC, NGI541_CRYPTO_OP_##n##_DEC,
+  NGI541_FOREACH_CRYPTO_CIPHER_ALG NGI541_FOREACH_CRYPTO_AEAD_ALG
 #undef _
-#define _(n, s) VNET_CRYPTO_OP_##n##_HASH, VNET_CRYPTO_OP_##n##_HMAC,
-    foreach_crypto_hash_alg
+#define _(n, s) NGI541_CRYPTO_OP_##n##_HASH, NGI541_CRYPTO_OP_##n##_HMAC,
+    NGI541_FOREACH_CRYPTO_HASH_ALG
 #undef _
 #define _(n, s, k, t, a)                                                      \
-  VNET_CRYPTO_OP_##n##_TAG##t##_AAD##a##_ENC,                                 \
-    VNET_CRYPTO_OP_##n##_TAG##t##_AAD##a##_DEC,
-      foreach_crypto_aead_variant_alg
+  NGI541_CRYPTO_OP_##n##_TAG##t##_AAD##a##_ENC,                                 \
+    NGI541_CRYPTO_OP_##n##_TAG##t##_AAD##a##_DEC,
+      NGI541_FOREACH_CRYPTO_AEAD_VARIANT_ALG
 #undef _
 #define _(c, h, s, k, d)                                                      \
-  VNET_CRYPTO_OP_##c##_##h##_TAG##d##_ENC,                                    \
-    VNET_CRYPTO_OP_##c##_##h##_TAG##d##_DEC,
-	foreach_crypto_link_alg
+  NGI541_CRYPTO_OP_##c##_##h##_TAG##d##_ENC,                                    \
+    NGI541_CRYPTO_OP_##c##_##h##_TAG##d##_DEC,
+	NGI541_FOREACH_CRYPTO_LINK_ALG
 #undef _
-	  VNET_CRYPTO_N_OP_IDS,
-} __clib_packed vnet_crypto_op_id_t;
+	  NGI541_CRYPTO_N_OP_IDS,
+} __clib_packed ngi541_crypto_op_id_t;
 
-#define foreach_crypto_handler_type                                                                \
+#define NGI541_FOREACH_CRYPTO_HANDLER_TYPE                                                                \
   _ (SIMPLE, "simple")                                                                             \
   _ (CHAINED, "chained")
 
 typedef enum
 {
-#define _(n, s) VNET_CRYPTO_HANDLER_TYPE_##n,
-  foreach_crypto_handler_type
+#define _(n, s) NGI541_CRYPTO_HANDLER_TYPE_##n,
+  NGI541_FOREACH_CRYPTO_HANDLER_TYPE
 #undef _
-    VNET_CRYPTO_HANDLER_N_TYPES
+    NGI541_CRYPTO_HANDLER_N_TYPES
 
-} vnet_crypto_handler_type_t;
+} ngi541_crypto_handler_type_t;
 
 
 typedef struct
@@ -198,7 +198,7 @@ typedef struct
   u8 *src;
   u8 *dst;
   u32 len;
-} vnet_crypto_op_chunk_t;
+} ngi541_crypto_op_chunk_t;
 
 typedef struct
 {
@@ -211,7 +211,7 @@ typedef struct
       u8 *dst;
     };
 
-    /* valid if VNET_CRYPTO_OP_FLAG_CHAINED_BUFFERS is set */
+    /* valid if NGI541_CRYPTO_OP_FLAG_CHAINED_BUFFERS is set */
     struct
     {
       u32 chunk_index;
@@ -235,10 +235,10 @@ typedef struct
 
   union
   {
-    /* valid if VNET_CRYPTO_OP_FLAG_IS_KEY_DATA is set */
+    /* valid if NGI541_CRYPTO_OP_FLAG_IS_KEY_DATA is set */
     uword key_data;
 
-    /* valid if VNET_CRYPTO_OP_FLAG_IS_KEY_DATA is NOT set */
+    /* valid if NGI541_CRYPTO_OP_FLAG_IS_KEY_DATA is NOT set */
     u32 key_index;
   };
   u32 user_data;
@@ -247,16 +247,16 @@ typedef struct
   {
     u32 len;
 
-    /* valid if VNET_CRYPTO_OP_FLAG_CHAINED_BUFFERS is set */
+    /* valid if NGI541_CRYPTO_OP_FLAG_CHAINED_BUFFERS is set */
     u16 n_chunks;
   };
 
-  vnet_crypto_op_id_t op;
-  vnet_crypto_op_status_t status : 8;
+  ngi541_crypto_op_id_t op;
+  ngi541_crypto_op_status_t status : 8;
   u8 flags;
-#define VNET_CRYPTO_OP_FLAG_HMAC_CHECK	    (1 << 0)
-#define VNET_CRYPTO_OP_FLAG_CHAINED_BUFFERS (1 << 1)
-#define VNET_CRYPTO_OP_FLAG_IS_KEY_DATA	    (1 << 2)
+#define NGI541_CRYPTO_OP_FLAG_HMAC_CHECK	    (1 << 0)
+#define NGI541_CRYPTO_OP_FLAG_CHAINED_BUFFERS (1 << 1)
+#define NGI541_CRYPTO_OP_FLAG_IS_KEY_DATA	    (1 << 2)
 
   union
   {
@@ -270,30 +270,30 @@ typedef struct
     u16 integ_n_chunks;
     u16 aad_len;
   };
-} vnet_crypto_op_t;
+} ngi541_crypto_op_t;
 
-STATIC_ASSERT_SIZEOF (vnet_crypto_op_t, CLIB_CACHE_LINE_BYTES);
+STATIC_ASSERT_SIZEOF (ngi541_crypto_op_t, CLIB_CACHE_LINE_BYTES);
 
 typedef struct
 {
-  vnet_crypto_alg_t alg;
+  ngi541_crypto_alg_t alg;
   void *per_thread_key_data;
   void *per_thread_ctx;
   const u8 *key;
   u16 key_length;
-} vnet_crypto_key_handler_args_t;
+} ngi541_crypto_key_handler_args_t;
 
-typedef u32 (vnet_crypto_chained_op_fn_t) (vnet_crypto_op_t *ops[], vnet_crypto_op_chunk_t *chunks,
+typedef u32 (ngi541_crypto_chained_op_fn_t) (ngi541_crypto_op_t *ops[], ngi541_crypto_op_chunk_t *chunks,
 					   u32 n_ops);
 
-typedef u32 (vnet_crypto_simple_op_fn_t) (vnet_crypto_op_t *ops[], u32 n_ops);
+typedef u32 (ngi541_crypto_simple_op_fn_t) (ngi541_crypto_op_t *ops[], u32 n_ops);
 
-typedef void (vnet_crypto_key_fn_t) (vnet_crypto_key_op_t kop, vnet_crypto_key_handler_args_t a);
+typedef void (ngi541_crypto_key_fn_t) (ngi541_crypto_key_op_t kop, ngi541_crypto_key_handler_args_t a);
 
 
 
 static_always_inline void
-vnet_crypto_op_init (vnet_crypto_op_t * op, vnet_crypto_op_id_t type)
+ngi541_crypto_op_init (ngi541_crypto_op_t * op, ngi541_crypto_op_id_t type)
 {
   if (CLIB_DEBUG > 0)
     clib_memset (op, 0xfe, sizeof (*op));
@@ -304,4 +304,4 @@ vnet_crypto_op_init (vnet_crypto_op_t * op, vnet_crypto_op_id_t type)
 }
 
 
-#endif /* included_ngi541_crypto_types_h */
+#endif /* NGI541_INTERNAL_CRYPTO_TYPES_H */
