@@ -12,7 +12,6 @@
 
 typedef struct
 {
-  ngi541_crypto_op_id_t op_id;
   ngi541_crypto_simple_op_fn_t *fn;
   ngi541_crypto_chained_op_fn_t *cfn;
 } ngi541_provider_op_handler_t;
@@ -35,6 +34,7 @@ typedef struct ngi541_provider
   ngi541_provider_init_fn_t *init;
   ngi541_crypto_key_fn_t *key_handler;
   ngi541_provider_op_handler_t *op_handlers;
+  u32 op_handler_count;
 } ngi541_provider_t;
 
 #endif /* NGI541_INTERNAL_PROVIDER_H */

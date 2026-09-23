@@ -11,7 +11,7 @@
 ngi541_native_registry_t ngi541_native_registry;
 
 static ngi541_provider_op_handler_t
-  op_handlers[NGI541_CRYPTO_N_OP_IDS + 1];
+  op_handlers[NGI541_CRYPTO_N_OP_IDS];
 
 static void
 ngi541_native_key_handler (
@@ -45,7 +45,15 @@ ngi541_native_init (ngi541_provider_t *provider)
 
   clib_memset (op_handlers, 0, sizeof (op_handlers));
 
-  ngi541_provider_op_handler_t *out = op_handlers;
+  clib_memset (
+    provider->key_data_size,
+    0,
+    sizeof (provider->key_data_size));
+
+  clib_memset (
+    registry->key_fn,
+    0,
+    sizeof (registry->key_fn));
 
   while (oh)
     {
@@ -66,7 +74,6 @@ ngi541_native_init (ngi541_provider_t *provider)
           best_by_alg_id[kh->alg_id]->priority < kh->priority)
         best_by_alg_id[kh->alg_id] = kh;
 
-      provider->key_data_size[kh->alg_id] = kh->key_data_size;
       kh = kh->next;
     }
 
@@ -76,13 +83,7 @@ ngi541_native_init (ngi541_provider_t *provider)
 
       if (oh)
         {
-          ASSERT (
-            (uword) (out - op_handlers) <
-            ARRAY_LEN (op_handlers) - 1
-          );
-
-          *out++ = (ngi541_provider_op_handler_t) {
-            .op_id = oh->op_id,
+          op_handlers[i] = (ngi541_provider_op_handler_t) {
             .fn = oh->fn,
             .cfn = oh->cfn,
           };
@@ -94,7 +95,11 @@ ngi541_native_init (ngi541_provider_t *provider)
       kh = best_by_alg_id[i];
 
       if (kh)
-        registry->key_fn[kh->alg_id] = kh->key_fn;
+        {
+          registry->key_fn[kh->alg_id] = kh->key_fn;
+          provider->key_data_size[kh->alg_id] =
+            kh->key_data_size;
+        }
     }
 
   return 0;
@@ -107,4 +112,5 @@ ngi541_provider_t ngi541_native_provider = {
   .init = ngi541_native_init,
   .key_handler = ngi541_native_key_handler,
   .op_handlers = op_handlers,
+  .op_handler_count = NGI541_CRYPTO_N_OP_IDS,
 };
