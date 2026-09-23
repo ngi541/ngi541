@@ -12,11 +12,14 @@
 NGI541_BEGIN_DECLS
 
 /*
- * Public engine interface.
+ * Initializes the NGI541 execution engine and selects the best
+ * available native implementations for the current environment.
  *
- * Provider registration and native handler machinery are internal
- * implementation details and are not exposed here.
+ * The function is idempotent. It must complete successfully before
+ * cryptographic execution functions are used.
  */
+NGI541_API ngi541_status_t
+ngi541_engine_init (void);
 
 NGI541_END_DECLS
 
