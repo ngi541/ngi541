@@ -6,7 +6,7 @@
 #ifndef included_clib_vector_h
 #define included_clib_vector_h
 
-#include <vppinfra/clib.h>
+#include <compat/base.h>
 
 /* Vector types. */
 

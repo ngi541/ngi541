@@ -12,9 +12,9 @@
 #ifndef included_clib_string_h
 #define included_clib_string_h
 
-#include <vppinfra/clib.h>	/* for CLIB_LINUX_KERNEL */
+#include <compat/base.h>	/* for CLIB_LINUX_KERNEL */
 #include <vppinfra/vector.h>
-#include <vppinfra/error_bootstrap.h>
+#include <compat/assert.h>
 #ifdef __SSE4_2__
 #include <vppinfra/memcpy_x86_64.h>
 #endif

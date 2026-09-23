@@ -4,7 +4,7 @@
  * Modified for NGI541: source layout and include paths.
  */
 
-#include <vppinfra/clib.h>
+#include <compat/base.h>
 #include <vppinfra/vector.h>
 
 /*

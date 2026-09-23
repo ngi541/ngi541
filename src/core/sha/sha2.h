@@ -7,7 +7,8 @@
 #ifndef included_sha2_h
 #define included_sha2_h
 
-#include <vppinfra/clib.h>
+#include <compat/base.h>
+#include <vppinfra/byte_order.h>
 #include <vppinfra/vector.h>
 #include <vppinfra/string.h>
 

@@ -6,7 +6,7 @@
 #ifndef included_clib_cache_h
 #define included_clib_cache_h
 
-#include <vppinfra/error_bootstrap.h>
+#include <compat/assert.h>
 
 /* Default cache line size of 64 bytes. */
 #ifndef CLIB_LOG2_CACHE_LINE_BYTES

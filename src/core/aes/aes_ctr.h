@@ -7,7 +7,7 @@
 #ifndef __crypto_aes_ctr_h__
 #define __crypto_aes_ctr_h__
 
-#include <vppinfra/clib.h>
+#include <compat/base.h>
 #include <vppinfra/vector.h>
 #include <vppinfra/cache.h>
 #include <vppinfra/string.h>

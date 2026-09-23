@@ -4,7 +4,7 @@
  * Modified for NGI541: source layout and include paths.
  */
 
-#include <vppinfra/cpu.h>
+#include "support/compat/cpu.h"
 
 #include "engine/crypto_types.h"
 #include "engine/crypto_native.h"

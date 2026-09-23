@@ -6,6 +6,8 @@
 #ifndef included_clib_types_h
 #define included_clib_types_h
 
+#include <compat/compiler.h>
+
 /* Standard CLIB types. */
 
 /* Define signed and unsigned 8, 16, 32, and 64 bit types

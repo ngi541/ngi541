@@ -6,7 +6,7 @@
 #ifndef included_vector_sse2_h
 #define included_vector_sse2_h
 
-#include <vppinfra/error_bootstrap.h>	/* for ASSERT */
+#include <compat/assert.h> /* for ASSERT */
 #include <x86intrin.h>
 
 #define foreach_sse42_vec128i \
