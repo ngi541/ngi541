@@ -1,8 +1,6 @@
 add_library(
     ngi541_support STATIC
-
     compat/string.c
-    platform/posix.c
 )
 
 add_library(

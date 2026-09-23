@@ -2,7 +2,7 @@
  * Copyright(c) 2021 Cisco Systems, Inc.
  */
 
-#include <vppinfra/clib.h>
+#include <compat/base.h>
 #ifndef included_memcpy_h
 #define included_memcpy_h
 

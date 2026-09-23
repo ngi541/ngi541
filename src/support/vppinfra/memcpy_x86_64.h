@@ -6,7 +6,7 @@
 #define included_clib_memcpy_x86_64_h
 #ifdef __x86_64__
 
-#include <vppinfra/clib.h>
+#include <compat/base.h>
 #include <vppinfra/warnings.h>
 #include <stdio.h>
 

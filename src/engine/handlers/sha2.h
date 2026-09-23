@@ -7,7 +7,7 @@
 #ifndef __sha2_h__
 #define __sha2_h__
 
-#include <vppinfra/cpu.h>
+#include "support/compat/cpu.h"
 
 #include "engine/crypto_types.h"
 #include "engine/crypto_native.h"

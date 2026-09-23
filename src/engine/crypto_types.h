@@ -8,7 +8,8 @@
 #ifndef included_ngi541_crypto_types_h
 #define included_ngi541_crypto_types_h
 
-#include <vppinfra/clib.h>
+#include <compat/assert.h>
+#include <compat/base.h>
 #include <vppinfra/cache.h>
 #include <vppinfra/string.h>
 

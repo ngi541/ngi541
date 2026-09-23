@@ -7,7 +7,8 @@
 #ifndef __crypto_aes_gcm_h__
 #define __crypto_aes_gcm_h__
 
-#include <vppinfra/clib.h>
+#include <compat/base.h>
+#include <vppinfra/byte_order.h>
 #include <vppinfra/vector.h>
 #include <vppinfra/cache.h>
 #include <vppinfra/string.h>

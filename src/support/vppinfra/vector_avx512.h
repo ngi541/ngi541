@@ -6,7 +6,7 @@
 #ifndef included_vector_avx512_h
 #define included_vector_avx512_h
 
-#include <vppinfra/clib.h>
+#include <compat/base.h>
 #include <x86intrin.h>
 
 #define foreach_avx512_vec512i \

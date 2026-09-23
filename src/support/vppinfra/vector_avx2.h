@@ -6,7 +6,8 @@
 #ifndef included_vector_avx2_h
 #define included_vector_avx2_h
 
-#include <vppinfra/clib.h>
+#include <compat/assert.h>
+#include <compat/base.h>
 #include <x86intrin.h>
 
 #define foreach_avx2_vec256i \
