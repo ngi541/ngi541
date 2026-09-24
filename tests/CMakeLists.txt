@@ -80,4 +80,36 @@ if(NGI541_BUILD_ENGINE)
         NAME crypto.aes_cbc_kat
         COMMAND ngi541_aes_cbc_kat_test
     )
+
+    add_executable(
+        ngi541_aes_ctr_kat_test
+        public/aes_ctr_kat.c
+    )
+
+    target_link_libraries(
+        ngi541_aes_ctr_kat_test
+        PRIVATE
+            NGI541::engine
+    )
+
+    add_test(
+        NAME crypto.aes_ctr_kat
+        COMMAND ngi541_aes_ctr_kat_test
+    )
+
+    add_executable(
+        ngi541_aes_gcm_kat_test
+        public/aes_gcm_kat.c
+    )
+
+    target_link_libraries(
+        ngi541_aes_gcm_kat_test
+        PRIVATE
+            NGI541::engine
+    )
+
+    add_test(
+        NAME crypto.aes_gcm_kat
+        COMMAND ngi541_aes_gcm_kat_test
+    )
 endif()
