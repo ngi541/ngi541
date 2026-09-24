@@ -3,20 +3,29 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.compiler }} / ${{ matrix.build_type }}
+    runs-on: ubuntu-24.04
 
     strategy:
+      fail-fast: false
       matrix:
         compiler: [gcc, clang]
+        build_type: [Debug, Release]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Configure compiler
         run: |
@@ -31,12 +40,17 @@ jobs:
           cmake \
             -S . \
             -B build \
-            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DNGI541_BUILD_ENGINE=ON \
             -DNGI541_BUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build build --parallel
+        run: |
+          cmake --build build --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          ctest \
+            --test-dir build \
+            --output-on-failure \
+            --no-tests=error
