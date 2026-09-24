@@ -1,0 +1,28 @@
+[
+    {
+      "acvVersion": "1.0"
+    },
+    {
+      "vsId": 9002,
+      "algorithm": "SHA2-256",
+      "revision": "1.0",
+      "testGroups": [
+        {
+          "tgId": 1,
+          "testType": "AFT",
+          "tests": [
+            {
+              "tcId": 1,
+              "len": 0,
+              "msg": ""
+            },
+            {
+              "tcId": 2,
+              "len": 24,
+              "msg": "616263"
+            }
+          ]
+        }
+      ]
+    }
+  ]
