@@ -128,4 +128,8 @@ if(NGI541_BUILD_ENGINE)
         NAME crypto.sha224_kat
         COMMAND ngi541_sha224_kat_test
     )
+
+    if(NGI541_BUILD_ACVP)
+        add_subdirectory(acvp)
+    endif()
 endif()

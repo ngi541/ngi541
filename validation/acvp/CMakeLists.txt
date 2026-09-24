@@ -90,21 +90,36 @@ add_dependencies(
     ngi541_libacvp_external
 )
 
-add_executable(
-    ngi541_acvp
-    main.c
+add_library(
+    ngi541_acvp_adapter STATIC
+
     adapter.c
+
+    callbacks/aes_cbc.c
+
+    registrations/profile_v1.c
 )
 
 target_include_directories(
-    ngi541_acvp
-    PRIVATE
+    ngi541_acvp_adapter
+    PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(
+    ngi541_acvp_adapter
+    PUBLIC
+        NGI541::engine
+        ngi541_libacvp
+)
+
+add_executable(
+    ngi541_acvp
+    main.c
 )
 
 target_link_libraries(
     ngi541_acvp
     PRIVATE
-        NGI541::engine
-        ngi541_libacvp
+        ngi541_acvp_adapter
 )
