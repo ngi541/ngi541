@@ -1,6 +1,7 @@
 add_library(
     ngi541_engine_objects OBJECT
 
+    execute.c
     native.c
 
     handlers/aes_cbc.c

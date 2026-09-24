@@ -32,4 +32,20 @@ if(NGI541_BUILD_ENGINE)
         NAME public.api_compile
         COMMAND ngi541_public_api_compile_test
     )
+
+    add_executable(
+        ngi541_public_api_runtime_test
+        public/api_runtime.c
+    )
+
+    target_link_libraries(
+        ngi541_public_api_runtime_test
+        PRIVATE
+            NGI541::engine
+    )
+
+    add_test(
+        NAME public.api_runtime
+        COMMAND ngi541_public_api_runtime_test
+    )
 endif()
