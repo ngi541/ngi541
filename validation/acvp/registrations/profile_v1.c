@@ -7,6 +7,7 @@
 
 #include "callbacks/aes_cbc.h"
 #include "callbacks/aes_ctr.h"
+#include "callbacks/aes_gcm.h"
 
 ACVP_RESULT
 ngi541_acvp_register_profile_v1 (
@@ -176,6 +177,151 @@ ngi541_acvp_register_profile_v1 (
       ACVP_SYM_CIPH_DOMAIN_PTLEN,
       8,
       128,
+      8);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * AES-GCM
+   *
+   * NGI541 ACVP profile v1 intentionally advertises only the
+   * subset supported by the current public NGI541 API:
+   *
+   *   key:     128 / 192 / 256 bits
+   *   IV:      96 bits
+   *   tag:     128 bits
+   *   payload: byte-aligned
+   *   AAD:     byte-aligned
+   *
+   * IV generation is external. NGI541 consumes the IV supplied
+   * by the ACVP test case and does not generate GCM IVs.
+   */
+
+  result =
+    acvp_cap_sym_cipher_enable (
+      ctx,
+      ACVP_AES_GCM,
+      ngi541_acvp_aes_gcm_handler);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_PARM_DIR,
+      ACVP_SYM_CIPH_DIR_BOTH);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * NGI541 does not internally generate GCM IVs.
+   * The ACVP test vector supplies the IV to the callback.
+   */
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_PARM_IVGEN_SRC,
+      ACVP_SYM_CIPH_IVGEN_SRC_EXT);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * AES key sizes supported by the public NGI541 GCM API.
+   */
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_KEYLEN,
+      128);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_KEYLEN,
+      192);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_KEYLEN,
+      256);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * Current NGI541 GCM implementation supports a 96-bit IV only.
+   *
+   * Registration domains are expressed in bits.
+   */
+  result =
+    acvp_cap_sym_cipher_set_domain (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_DOMAIN_IVLEN,
+      96,
+      96,
+      8);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * Current NGI541 public GCM contract supports a 128-bit tag only.
+   */
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_TAGLEN,
+      128);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * Advertise byte-aligned payload lengths.
+   *
+   * The ACVP capability domain is expressed in bits; the callback
+   * receives the parsed payload length in bytes.
+   */
+  result =
+    acvp_cap_sym_cipher_set_domain (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_DOMAIN_PTLEN,
+      0,
+      65536,
+      8);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * Advertise byte-aligned AAD lengths.
+   */
+  result =
+    acvp_cap_sym_cipher_set_domain (
+      ctx,
+      ACVP_AES_GCM,
+      ACVP_SYM_CIPH_DOMAIN_AADLEN,
+      0,
+      65536,
       8);
 
   if (result != ACVP_SUCCESS)

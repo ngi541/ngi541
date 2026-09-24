@@ -97,6 +97,7 @@ add_library(
 
     callbacks/aes_cbc.c
     callbacks/aes_ctr.c
+    callbacks/aes_gcm.c
 
     registrations/profile_v1.c
 )
