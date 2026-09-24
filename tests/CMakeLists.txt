@@ -64,4 +64,20 @@ if(NGI541_BUILD_ENGINE)
         NAME crypto.sha256_kat
         COMMAND ngi541_sha256_kat_test
     )
+
+    add_executable(
+        ngi541_aes_cbc_kat_test
+        public/aes_cbc_kat.c
+    )
+
+    target_link_libraries(
+        ngi541_aes_cbc_kat_test
+        PRIVATE
+            NGI541::engine
+    )
+
+    add_test(
+        NAME crypto.aes_cbc_kat
+        COMMAND ngi541_aes_cbc_kat_test
+    )
 endif()
