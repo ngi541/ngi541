@@ -74,29 +74,43 @@ ngi541_native_ops_hmac_sha2 (ngi541_crypto_op_t *ops[], u32 n_ops, ngi541_crypto
   return n_ops - n_fail;
 }
 
-static int
-sha2_probe ()
+static_always_inline int
+sha2_probe (void)
 {
 #if defined(__x86_64__)
 
 #if defined(__SHA__) && defined(__AVX512F__)
-  if (clib_cpu_supports_sha () && clib_cpu_supports_avx512f ())
+  if (clib_cpu_supports_sha () &&
+      clib_cpu_supports_avx512f ())
     return 30;
+
 #elif defined(__SHA__) && defined(__AVX2__)
-  if (clib_cpu_supports_sha () && clib_cpu_supports_avx2 ())
+  if (clib_cpu_supports_sha () &&
+      clib_cpu_supports_avx2 ())
     return 20;
+
 #elif defined(__SHA__)
   if (clib_cpu_supports_sha ())
     return 10;
 #endif
 
 #elif defined(__aarch64__)
+
 #if defined(__ARM_FEATURE_SHA2)
   if (clib_cpu_supports_sha2 ())
     return 10;
 #endif
+
 #endif
-  return -1;
+
+  /*
+   * The SHA-2 core provides a baseline implementation when dedicated
+   * SHA ISA extensions are not enabled for this build.
+   *
+   * Priority zero keeps the baseline implementation available while
+   * allowing ISA-accelerated variants to take precedence when present.
+   */
+  return 0;
 }
 
 #endif /* __sha2_h__ */
