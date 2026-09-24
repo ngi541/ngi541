@@ -12,8 +12,7 @@
 #include <string.h>
 
 #define AES_CTR_KEY_BITS       128U
-#define AES_CTR_IV_BITS        128U
-#define AES_CTR_PAYLOAD_BITS   512U
+#define AES_CTR_IV_BYTES       16U
 #define AES_CTR_PAYLOAD_BYTES  64U
 
 static const unsigned char key[16] = {
@@ -89,13 +88,13 @@ test_encrypt (void)
   tc.key_len = AES_CTR_KEY_BITS;
 
   tc.iv = (unsigned char *) counter;
-  tc.iv_len = AES_CTR_IV_BITS;
+  tc.iv_len = AES_CTR_IV_BYTES;
 
   tc.pt = (unsigned char *) plaintext;
-  tc.pt_len = AES_CTR_PAYLOAD_BITS;
+  tc.pt_len = AES_CTR_PAYLOAD_BYTES;
 
   tc.ct = output;
-  tc.ct_len = AES_CTR_PAYLOAD_BITS;
+  tc.ct_len = AES_CTR_PAYLOAD_BYTES;
 
   test_case.tc.symmetric = &tc;
 
@@ -108,7 +107,7 @@ test_encrypt (void)
       return 1;
     }
 
-  if (tc.ct_len != AES_CTR_PAYLOAD_BITS)
+  if (tc.ct_len != AES_CTR_PAYLOAD_BYTES)
     return 2;
 
   if (memcmp (
@@ -141,13 +140,13 @@ test_decrypt (void)
   tc.key_len = AES_CTR_KEY_BITS;
 
   tc.iv = (unsigned char *) counter;
-  tc.iv_len = AES_CTR_IV_BITS;
+  tc.iv_len = AES_CTR_IV_BYTES;
 
   tc.ct = (unsigned char *) ciphertext;
-  tc.ct_len = AES_CTR_PAYLOAD_BITS;
+  tc.ct_len = AES_CTR_PAYLOAD_BYTES;
 
   tc.pt = output;
-  tc.pt_len = AES_CTR_PAYLOAD_BITS;
+  tc.pt_len = AES_CTR_PAYLOAD_BYTES;
 
   test_case.tc.symmetric = &tc;
 
@@ -160,7 +159,7 @@ test_decrypt (void)
       return 1;
     }
 
-  if (tc.pt_len != AES_CTR_PAYLOAD_BITS)
+  if (tc.pt_len != AES_CTR_PAYLOAD_BYTES)
     return 2;
 
   if (memcmp (
@@ -173,45 +172,6 @@ test_decrypt (void)
         "AES-CTR ACVP decrypt KAT mismatch\n");
 
       return 3;
-    }
-
-  return 0;
-}
-
-static int
-test_reject_non_byte_aligned_payload (void)
-{
-  unsigned char output[2] = { 0 };
-  unsigned char input[2] = { 0 };
-
-  ACVP_SYM_CIPHER_TC tc = { 0 };
-  ACVP_TEST_CASE test_case = { 0 };
-
-  tc.cipher = ACVP_AES_CTR;
-  tc.direction = ACVP_SYM_CIPH_DIR_ENCRYPT;
-
-  tc.key = (unsigned char *) key;
-  tc.key_len = AES_CTR_KEY_BITS;
-
-  tc.iv = (unsigned char *) counter;
-  tc.iv_len = AES_CTR_IV_BITS;
-
-  tc.pt = input;
-  tc.pt_len = 9U;
-
-  tc.ct = output;
-  tc.ct_len = 9U;
-
-  test_case.tc.symmetric = &tc;
-
-  if (ngi541_acvp_aes_ctr_handler (&test_case) == 0)
-    {
-      fprintf (
-        stderr,
-        "AES-CTR ACVP callback accepted "
-        "non-byte-aligned payload\n");
-
-      return 1;
     }
 
   return 0;
@@ -244,12 +204,6 @@ main (void)
 
   if (result != 0)
     return 20 + result;
-
-  result =
-    test_reject_non_byte_aligned_payload ();
-
-  if (result != 0)
-    return 30 + result;
 
   return 0;
 }

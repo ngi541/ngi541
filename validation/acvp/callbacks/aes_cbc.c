@@ -10,7 +10,7 @@
 #include <stddef.h>
 
 static int
-ngi541_acvp_bits_to_bytes (
+ngi541_acvp_key_bits_to_bytes (
   unsigned int bits,
   size_t *bytes)
 {
@@ -58,21 +58,25 @@ ngi541_acvp_aes_cbc_handler (
   if (tc->key == NULL || tc->iv == NULL)
     return 1;
 
-  if (!ngi541_acvp_bits_to_bytes (
+  /*
+   * libacvp exposes the AES key length in bits.
+   */
+  if (!ngi541_acvp_key_bits_to_bytes (
         tc->key_len,
         &key_len))
     return 1;
 
-  if (!ngi541_acvp_bits_to_bytes (
-        tc->iv_len,
-        &iv_len))
-    return 1;
+  /*
+   * libacvp exposes IV and payload lengths to the callback
+   * in bytes.
+   */
+  iv_len = (size_t) tc->iv_len;
 
   /*
    * NGI541 AES-CBC v1 supports:
    *
    *   key: 128 / 192 / 256 bits
-   *   IV:  128 bits
+   *   IV:  16 bytes
    */
   if (key_len != 16 &&
       key_len != 24 &&
@@ -88,10 +92,7 @@ ngi541_acvp_aes_cbc_handler (
       if (tc->pt == NULL || tc->ct == NULL)
         return 1;
 
-      if (!ngi541_acvp_bits_to_bytes (
-            tc->pt_len,
-            &input_len))
-        return 1;
+      input_len = (size_t) tc->pt_len;
 
       /*
        * CBC operates on complete AES blocks.
@@ -127,7 +128,7 @@ ngi541_acvp_aes_cbc_handler (
 
       /*
        * AES-CBC without padding preserves payload length.
-       * libacvp expresses symmetric lengths in bits.
+       * libacvp callback payload lengths are expressed in bytes.
        */
       tc->ct_len = tc->pt_len;
 
@@ -137,10 +138,7 @@ ngi541_acvp_aes_cbc_handler (
       if (tc->ct == NULL || tc->pt == NULL)
         return 1;
 
-      if (!ngi541_acvp_bits_to_bytes (
-            tc->ct_len,
-            &input_len))
-        return 1;
+      input_len = (size_t) tc->ct_len;
 
       if ((input_len % 16U) != 0)
         return 1;

@@ -12,8 +12,7 @@
 #include <string.h>
 
 #define AES_CBC_KEY_BITS       128U
-#define AES_CBC_IV_BITS        128U
-#define AES_CBC_PAYLOAD_BITS   512U
+#define AES_CBC_IV_BYTES       16U
 #define AES_CBC_PAYLOAD_BYTES  64U
 
 static int
@@ -90,13 +89,13 @@ test_encrypt (void)
   tc.key_len = AES_CBC_KEY_BITS;
 
   tc.iv = iv;
-  tc.iv_len = AES_CBC_IV_BITS;
+  tc.iv_len = AES_CBC_IV_BYTES;
 
   tc.pt = plaintext;
-  tc.pt_len = AES_CBC_PAYLOAD_BITS;
+  tc.pt_len = AES_CBC_PAYLOAD_BYTES;
 
   tc.ct = ciphertext;
-  tc.ct_len = AES_CBC_PAYLOAD_BITS;
+  tc.ct_len = AES_CBC_PAYLOAD_BYTES;
 
   test_case.tc.symmetric = &tc;
 
@@ -109,7 +108,7 @@ test_encrypt (void)
       return 1;
     }
 
-  if (tc.ct_len != AES_CBC_PAYLOAD_BITS)
+  if (tc.ct_len != AES_CBC_PAYLOAD_BYTES)
     {
       fprintf (
         stderr,
@@ -210,13 +209,13 @@ test_decrypt (void)
   tc.key_len = AES_CBC_KEY_BITS;
 
   tc.iv = iv;
-  tc.iv_len = AES_CBC_IV_BITS;
+  tc.iv_len = AES_CBC_IV_BYTES;
 
   tc.ct = ciphertext;
-  tc.ct_len = AES_CBC_PAYLOAD_BITS;
+  tc.ct_len = AES_CBC_PAYLOAD_BYTES;
 
   tc.pt = plaintext;
-  tc.pt_len = AES_CBC_PAYLOAD_BITS;
+  tc.pt_len = AES_CBC_PAYLOAD_BYTES;
 
   test_case.tc.symmetric = &tc;
 
@@ -229,7 +228,7 @@ test_decrypt (void)
       return 1;
     }
 
-  if (tc.pt_len != AES_CBC_PAYLOAD_BITS)
+  if (tc.pt_len != AES_CBC_PAYLOAD_BYTES)
     {
       fprintf (
         stderr,
