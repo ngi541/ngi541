@@ -83,3 +83,19 @@ add_test(
     NAME acvp.sha256_callback_kat
     COMMAND ngi541_acvp_sha256_callback_kat
 )
+
+add_executable(
+    ngi541_acvp_sha224_callback_kat
+    sha224_callback_kat.c
+)
+
+target_link_libraries(
+    ngi541_acvp_sha224_callback_kat
+    PRIVATE
+        ngi541_acvp_adapter
+)
+
+add_test(
+    NAME acvp.sha224_callback_kat
+    COMMAND ngi541_acvp_sha224_callback_kat
+)

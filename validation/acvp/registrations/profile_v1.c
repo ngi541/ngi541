@@ -357,5 +357,34 @@ ngi541_acvp_register_profile_v1 (
   if (result != ACVP_SUCCESS)
     return result;
 
+  /*
+   * SHA2-224
+   *
+   * NGI541 profile v1 exposes byte-aligned one-shot SHA-224
+   * messages through the public hash API.
+   *
+   * ACVP registration domains are expressed in bits.
+   */
+  result =
+    acvp_cap_hash_enable (
+      ctx,
+      ACVP_HASH_SHA224,
+      ngi541_acvp_sha2_handler);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_hash_set_domain (
+      ctx,
+      ACVP_HASH_SHA224,
+      ACVP_HASH_MESSAGE_LEN,
+      0,
+      65536,
+      8);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
   return ACVP_SUCCESS;
 }
