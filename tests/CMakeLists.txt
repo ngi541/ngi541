@@ -112,4 +112,20 @@ if(NGI541_BUILD_ENGINE)
         NAME crypto.aes_gcm_kat
         COMMAND ngi541_aes_gcm_kat_test
     )
+
+    add_executable(
+        ngi541_sha224_kat_test
+        public/sha224_kat.c
+    )
+
+    target_link_libraries(
+        ngi541_sha224_kat_test
+        PRIVATE
+            NGI541::engine
+    )
+
+    add_test(
+        NAME crypto.sha224_kat
+        COMMAND ngi541_sha224_kat_test
+    )
 endif()
