@@ -5,8 +5,50 @@
 
 #include "adapter.h"
 
+#include <stdio.h>
+
 int
-main (void)
+main (
+  int argc,
+  char **argv)
 {
-  return ngi541_acvp_adapter_build_probe ();
+  int result;
+
+  /*
+   * Preserve the original build/registration probe.
+   */
+  if (argc == 1)
+    return ngi541_acvp_adapter_build_probe ();
+
+  /*
+   * Offline vector processing:
+   *
+   *   ngi541_acvp request.json response.json
+   */
+  if (argc != 3)
+    {
+      fprintf (
+        stderr,
+        "usage: %s [request.json response.json]\n",
+        argv[0]);
+
+      return 64;
+    }
+
+  result =
+    ngi541_acvp_run_offline (
+      argv[1],
+      argv[2]);
+
+  if (result != 0)
+    {
+      fprintf (
+        stderr,
+        "NGI541 ACVP offline processing failed: %d\n",
+        result);
+
+      return result;
+    }
+
+  return 0;
 }
