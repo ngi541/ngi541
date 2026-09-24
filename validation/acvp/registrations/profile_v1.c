@@ -6,6 +6,7 @@
 #include "registrations/profile_v1.h"
 
 #include "callbacks/aes_cbc.h"
+#include "callbacks/aes_ctr.h"
 
 ACVP_RESULT
 ngi541_acvp_register_profile_v1 (
@@ -78,6 +79,104 @@ ngi541_acvp_register_profile_v1 (
       ACVP_AES_CBC,
       ACVP_SYM_CIPH_KEYLEN,
       256);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * AES-CTR
+   *
+   * NGI541 uses an incrementing 128-bit counter block.
+   * Counter overflow support is intentionally not advertised.
+   */
+
+  result =
+    acvp_cap_sym_cipher_enable (
+      ctx,
+      ACVP_AES_CTR,
+      ngi541_acvp_aes_ctr_handler);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_CTR,
+      ACVP_SYM_CIPH_PARM_DIR,
+      ACVP_SYM_CIPH_DIR_BOTH);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_CTR,
+      ACVP_SYM_CIPH_PARM_PERFORM_CTR,
+      1);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_CTR,
+      ACVP_SYM_CIPH_PARM_CTR_INCR,
+      1);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_CTR,
+      ACVP_SYM_CIPH_PARM_CTR_OVRFLW,
+      0);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_CTR,
+      ACVP_SYM_CIPH_KEYLEN,
+      128);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_CTR,
+      ACVP_SYM_CIPH_KEYLEN,
+      192);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_parm (
+      ctx,
+      ACVP_AES_CTR,
+      ACVP_SYM_CIPH_KEYLEN,
+      256);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_sym_cipher_set_domain (
+      ctx,
+      ACVP_AES_CTR,
+      ACVP_SYM_CIPH_DOMAIN_PTLEN,
+      8,
+      128,
+      8);
 
   if (result != ACVP_SUCCESS)
     return result;
