@@ -68,6 +68,17 @@ add_test(
         "${CMAKE_CURRENT_SOURCE_DIR}/verify_sha256_offline.cmake"
 )
 
+add_test(
+    NAME acvp.sha224_offline
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DNGI541_ACVP_RUNNER=$<TARGET_FILE:ngi541_acvp>"
+        "-DNGI541_ACVP_REQUEST=${CMAKE_CURRENT_SOURCE_DIR}/vectors/sha224_aft.json"
+        "-DNGI541_ACVP_RESPONSE=${CMAKE_CURRENT_BINARY_DIR}/sha224_aft_response.json"
+        -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/verify_sha224_offline.cmake"
+)
+
 add_executable(
     ngi541_acvp_sha256_callback_kat
     sha256_callback_kat.c
