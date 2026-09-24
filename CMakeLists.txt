@@ -42,6 +42,21 @@ option(
     ON
 )
 
+option(
+    NGI541_BUILD_ACVP
+    "Build NGI541 ACVP validation harness"
+    OFF
+)
+
+# ACVP validation is a consumer of the public NGI541 engine API.
+# It cannot be built without the engine layer.
+if(NGI541_BUILD_ACVP AND NOT NGI541_BUILD_ENGINE)
+    message(
+        FATAL_ERROR
+        "NGI541_BUILD_ACVP requires NGI541_BUILD_ENGINE=ON"
+    )
+endif()
+
 # ---------------------------------------------------------------------------
 # Compiler configuration
 # ---------------------------------------------------------------------------
@@ -55,6 +70,18 @@ include(NGI541Compiler)
 # ---------------------------------------------------------------------------
 
 add_subdirectory(src)
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+if(NGI541_BUILD_ACVP)
+    add_subdirectory(validation/acvp)
+endif()
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
 
 if(NGI541_BUILD_TESTS)
     enable_testing()
