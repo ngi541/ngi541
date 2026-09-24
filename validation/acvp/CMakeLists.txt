@@ -85,6 +85,14 @@ set_target_properties(
             "${NGI541_LIBACVP_INSTALL_DIR}/include"
 )
 
+if(UNIX AND NOT APPLE)
+    target_link_libraries(
+        ngi541_libacvp
+        INTERFACE
+            m
+    )
+endif()
+
 add_dependencies(
     ngi541_libacvp
     ngi541_libacvp_external
