@@ -1,0 +1,63 @@
+[
+    {
+      "acvVersion": "1.0"
+    },
+    {
+      "vsId": 9001,
+      "algorithm": "ACVP-AES-GCM",
+      "revision": "1.0",
+      "testGroups": [
+        {
+          "tgId": 1,
+          "testType": "AFT",
+          "direction": "encrypt",
+          "keyLen": 128,
+          "ivLen": 96,
+          "ivGen": "external",
+          "ivGenMode": "8.2.2",
+          "payloadLen": 480,
+          "aadLen": 160,
+          "tagLen": 128,
+          "tests": [
+            {
+              "tcId": 1,
+              "key": "FEFFE9928665731C6D6A8F9467308308",
+              "iv": "CAFEBABEFACEDBADDECAF888",
+              "aad": "FEEDFACEDEADBEEFFEEDFACEDEADBEEFABADDAD2",
+              "pt": "D9313225F88406E5A55909C5AFF5269A86A7A9531534F7DA2E4C303D8A318A721C3C0C95956809532FCF0E2449A6B525B16AEDF5AA0DE657BA637B39"
+            }
+          ]
+        },
+        {
+          "tgId": 2,
+          "testType": "AFT",
+          "direction": "decrypt",
+          "keyLen": 128,
+          "ivLen": 96,
+          "ivGen": "external",
+          "ivGenMode": "8.2.2",
+          "payloadLen": 480,
+          "aadLen": 160,
+          "tagLen": 128,
+          "tests": [
+            {
+              "tcId": 2,
+              "key": "FEFFE9928665731C6D6A8F9467308308",
+              "iv": "CAFEBABEFACEDBADDECAF888",
+              "aad": "FEEDFACEDEADBEEFFEEDFACEDEADBEEFABADDAD2",
+              "ct": "42831EC2217774244B7221B784D0D49CE3AA212F2C02A4E035C17E2329ACA12E21D514B25466931C7D8F6A5AAC84AA051BA30B396A0AAC973D58E091",
+              "tag": "5BC94FBC3221A5DB94FAE95AE7121A47"
+            },
+            {
+              "tcId": 3,
+              "key": "FEFFE9928665731C6D6A8F9467308308",
+              "iv": "CAFEBABEFACEDBADDECAF888",
+              "aad": "FEEDFACEDEADBEEFFEEDFACEDEADBEEFABADDAD2",
+              "ct": "42831EC2217774244B7221B784D0D49CE3AA212F2C02A4E035C17E2329ACA12E21D514B25466931C7D8F6A5AAC84AA051BA30B396A0AAC973D58E091",
+              "tag": "5AC94FBC3221A5DB94FAE95AE7121A47"
+            }
+          ]
+        }
+      ]
+    }
+  ]

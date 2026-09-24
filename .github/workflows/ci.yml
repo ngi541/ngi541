@@ -13,8 +13,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  boundaries:
+    name: Architecture boundaries
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Show pinned submodules
+        run: |
+          git submodule status --recursive
+
+      - name: Verify ACVP validation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git grep -nE \
+            'engine/internal|src/core|vppinfra|compat/' \
+            -- validation/acvp; then
+            echo "::error::validation/acvp must use the public NGI541 API only"
+            exit 1
+          fi
+
+      - name: Verify production has no libacvp dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git grep -nE \
+            '#include[[:space:]]*[<"][^">]*acvp/' \
+            -- src include; then
+            echo "::error::Production NGI541 code must not depend on libacvp"
+            exit 1
+          fi
+
+
   build-test:
-    name: ${{ matrix.compiler }} / ${{ matrix.build_type }}
+    name: Core / ${{ matrix.compiler }} / ${{ matrix.build_type }}
     runs-on: ubuntu-24.04
 
     strategy:
@@ -26,9 +66,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Configure compiler
+        shell: bash
         run: |
+          set -euo pipefail
+
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
             echo "CC=gcc" >> "$GITHUB_ENV"
           else
@@ -42,11 +87,14 @@ jobs:
             -B build \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DNGI541_BUILD_ENGINE=ON \
-            -DNGI541_BUILD_TESTS=ON
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_ACVP=OFF
 
       - name: Build
         run: |
-          cmake --build build --parallel
+          cmake \
+            --build build \
+            --parallel
 
       - name: Test
         run: |
@@ -54,3 +102,93 @@ jobs:
             --test-dir build \
             --output-on-failure \
             --no-tests=error
+
+
+  acvp-validation:
+    name: ACVP / ${{ matrix.compiler }} / Debug
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install ACVP build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> "$GITHUB_ENV"
+          else
+            echo "CC=clang" >> "$GITHUB_ENV"
+          fi
+
+      - name: Show libacvp revision
+        run: |
+          git -C third_party/libacvp rev-parse HEAD
+          git submodule status third_party/libacvp
+
+      - name: Configure ACVP validation build
+        run: |
+          cmake \
+            -S . \
+            -B build-acvp \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_ACVP=ON
+
+      - name: Build ACVP validation
+        run: |
+          cmake \
+            --build build-acvp \
+            --parallel
+
+      - name: ACVP registration smoke test
+        run: |
+          ./build-acvp/validation/acvp/ngi541_acvp
+
+      - name: Run full test suite
+        run: |
+          ctest \
+            --test-dir build-acvp \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Run ACVP tests verbosely
+        if: failure()
+        run: |
+          ctest \
+            --test-dir build-acvp \
+            -R '^acvp\.' \
+            --output-on-failure \
+            -V || true
+
+      - name: Upload ACVP diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acvp-diagnostics-${{ matrix.compiler }}
+          if-no-files-found: ignore
+          path: |
+            build-acvp/Testing/Temporary/LastTest.log
+            build-acvp/tests/acvp/*_response.json
