@@ -8,6 +8,7 @@
 #include "callbacks/aes_cbc.h"
 #include "callbacks/aes_ctr.h"
 #include "callbacks/aes_gcm.h"
+#include "callbacks/sha2.h"
 
 ACVP_RESULT
 ngi541_acvp_register_profile_v1 (
@@ -320,6 +321,35 @@ ngi541_acvp_register_profile_v1 (
       ctx,
       ACVP_AES_GCM,
       ACVP_SYM_CIPH_DOMAIN_AADLEN,
+      0,
+      65536,
+      8);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  /*
+   * SHA2-256
+   *
+   * NGI541 profile v1 currently exposes byte-aligned one-shot
+   * SHA-256 messages through the public hash API.
+   *
+   * ACVP registration domains are expressed in bits.
+   */
+  result =
+    acvp_cap_hash_enable (
+      ctx,
+      ACVP_HASH_SHA256,
+      ngi541_acvp_sha2_handler);
+
+  if (result != ACVP_SUCCESS)
+    return result;
+
+  result =
+    acvp_cap_hash_set_domain (
+      ctx,
+      ACVP_HASH_SHA256,
+      ACVP_HASH_MESSAGE_LEN,
       0,
       65536,
       8);

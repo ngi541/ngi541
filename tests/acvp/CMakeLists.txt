@@ -56,3 +56,19 @@ add_test(
         -P
         "${CMAKE_CURRENT_SOURCE_DIR}/verify_aes_gcm_offline.cmake"
 )
+
+add_executable(
+    ngi541_acvp_sha256_callback_kat
+    sha256_callback_kat.c
+)
+
+target_link_libraries(
+    ngi541_acvp_sha256_callback_kat
+    PRIVATE
+        ngi541_acvp_adapter
+)
+
+add_test(
+    NAME acvp.sha256_callback_kat
+    COMMAND ngi541_acvp_sha256_callback_kat
+)
