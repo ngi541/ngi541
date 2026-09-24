@@ -402,3 +402,8 @@ _ (192, 256, 16, 24)
 _ (256, 256, 16, 32)
 
 #undef _
+
+void
+ngi541_native_link_aes_ctr_handlers (void)
+{
+}

@@ -98,3 +98,8 @@ _ (224)
 _ (256)
 
 #undef _
+
+void
+ngi541_native_link_sha2_handlers (void)
+{
+}

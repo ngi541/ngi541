@@ -189,3 +189,8 @@ probe ()
 
 _ (128) _ (192) _ (256)
 #undef _
+
+void
+ngi541_native_link_aes_gcm_handlers (void)
+{
+}

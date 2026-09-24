@@ -49,6 +49,19 @@ typedef struct
 extern ngi541_native_registry_t ngi541_native_registry;
 extern ngi541_provider_t ngi541_native_provider;
 
+/*
+ * Static-library link anchors.
+ *
+ * Native handler translation units primarily register themselves through
+ * constructors. A static archive linker does not extract an object file
+ * solely because it contains a constructor, so native.c keeps an explicit
+ * reference to each handler translation unit through these functions.
+ */
+void ngi541_native_link_aes_cbc_handlers (void);
+void ngi541_native_link_aes_ctr_handlers (void);
+void ngi541_native_link_aes_gcm_handlers (void);
+void ngi541_native_link_sha2_handlers (void);
+
 #define NGI541_NATIVE_OP_HANDLER(x)                                           \
   static ngi541_native_op_handler_t ngi541_native_op_handler_##x;             \
                                                                               \

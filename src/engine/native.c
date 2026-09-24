@@ -31,6 +31,19 @@ ngi541_native_init (ngi541_provider_t *provider)
 {
   ngi541_native_registry_t *registry = &ngi541_native_registry;
 
+  /*
+   * Keep all native handler translation units reachable when NGI541
+   * is consumed as a static library.
+   *
+   * Registration itself has already happened through constructors
+   * before program startup. These calls provide the strong linker
+   * references required to retain the handler object files.
+   */
+  ngi541_native_link_aes_cbc_handlers ();
+  ngi541_native_link_aes_ctr_handlers ();
+  ngi541_native_link_aes_gcm_handlers ();
+  ngi541_native_link_sha2_handlers ();
+
   if (registry->op_handlers == 0)
     return 0;
 
