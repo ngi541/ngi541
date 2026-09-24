@@ -6,77 +6,137 @@
 #include <dlfcn.h>
 #include <stdio.h>
 
-#include "engine/engine.h"
+static int
+check_symbol_exported (void *handle, const char *name)
+{
+  void *symbol;
+  const char *error;
+
+  dlerror ();
+
+  symbol = dlsym (handle, name);
+  error = dlerror ();
+
+  if (error != NULL || symbol == NULL)
+    {
+      fprintf (
+        stderr,
+        "public symbol is not exported: %s\n",
+        name);
+
+      return 0;
+    }
+
+  return 1;
+}
+
+
+static int
+check_symbol_hidden (void *handle, const char *name)
+{
+  const char *error;
+
+  dlerror ();
+
+  (void) dlsym (handle, name);
+  error = dlerror ();
+
+  if (error == NULL)
+    {
+      fprintf (
+        stderr,
+        "internal symbol is exported: %s\n",
+        name);
+
+      return 0;
+    }
+
+  return 1;
+}
+
 
 int
 main (int argc, char **argv)
 {
   void *handle;
-  vnet_crypto_engine_registration_t *r;
-  const char *error;
-  char *init_error;
 
   if (argc != 2)
     {
-      fprintf (stderr, "usage: %s <engine-library>\n", argv[0]);
+      fprintf (
+        stderr,
+        "usage: %s <engine-library>\n",
+        argv[0]);
+
       return 1;
     }
 
-  handle = dlopen (argv[1], RTLD_NOW | RTLD_LOCAL);
-  if (!handle)
+  handle = dlopen (
+    argv[1],
+    RTLD_NOW | RTLD_LOCAL);
+
+  if (handle == NULL)
     {
-      fprintf (stderr, "dlopen failed: %s\n", dlerror ());
+      fprintf (
+        stderr,
+        "dlopen failed: %s\n",
+        dlerror ());
+
       return 2;
     }
 
-  dlerror ();
+  if (!check_symbol_exported (
+        handle,
+        "ngi541_engine_init"))
+    goto public_symbol_error;
 
-  r = (vnet_crypto_engine_registration_t *)
-    dlsym (handle, "__vnet_crypto_engine");
+  if (!check_symbol_exported (
+        handle,
+        "ngi541_crypto_cipher_encrypt"))
+    goto public_symbol_error;
 
-  error = dlerror ();
-  if (error != NULL || r == NULL)
-    {
-      fprintf (stderr, "dlsym failed: %s\n",
-               error ? error : "registration not found");
-      dlclose (handle);
-      return 3;
-    }
+  if (!check_symbol_exported (
+        handle,
+        "ngi541_crypto_cipher_decrypt"))
+    goto public_symbol_error;
 
-  if (r->init_fn == NULL)
-    {
-      dlclose (handle);
-      return 4;
-    }
+  if (!check_symbol_exported (
+        handle,
+        "ngi541_crypto_aead_encrypt"))
+    goto public_symbol_error;
 
-  if (r->key_handler == NULL)
-    {
-      dlclose (handle);
-      return 5;
-    }
+  if (!check_symbol_exported (
+        handle,
+        "ngi541_crypto_aead_decrypt"))
+    goto public_symbol_error;
 
-  if (r->op_handlers == NULL)
-    {
-      dlclose (handle);
-      return 6;
-    }
+  if (!check_symbol_exported (
+        handle,
+        "ngi541_crypto_hash_compute"))
+    goto public_symbol_error;
 
-  init_error = r->init_fn (r);
+  if (!check_symbol_hidden (
+        handle,
+        "ngi541_native_provider"))
+    goto internal_symbol_error;
 
-  if (init_error != NULL)
-    {
-      fprintf (stderr, "engine init failed: %s\n", init_error);
-      dlclose (handle);
-      return 7;
-    }
+  if (!check_symbol_hidden (
+        handle,
+        "ngi541_native_registry"))
+    goto internal_symbol_error;
 
-  if (r->op_handlers[0].opt == VNET_CRYPTO_OP_NONE)
-    {
-      dlclose (handle);
-      return 8;
-    }
+  if (!check_symbol_hidden (
+        handle,
+        "clib_c11_violation"))
+    goto internal_symbol_error;
 
   dlclose (handle);
-
   return 0;
+
+public_symbol_error:
+  dlclose (handle);
+  return 3;
+
+internal_symbol_error:
+  dlclose (handle);
+  return 4;
 }

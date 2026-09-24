@@ -1,6 +1,7 @@
 add_library(
     ngi541_engine_objects OBJECT
 
+    execute.c
     native.c
 
     handlers/aes_cbc.c
@@ -13,12 +14,14 @@ set_target_properties(
     ngi541_engine_objects
     PROPERTIES
         POSITION_INDEPENDENT_CODE ON
+        C_VISIBILITY_PRESET hidden
 )
 
 target_include_directories(
     ngi541_engine_objects
     PRIVATE
         ${PROJECT_SOURCE_DIR}/src
+        ${PROJECT_SOURCE_DIR}/include
 )
 
 target_link_libraries(
@@ -32,9 +35,11 @@ add_library(
     $<TARGET_OBJECTS:ngi541_engine_objects>
 )
 
-add_library(
-    NGI541::engine
-    ALIAS ngi541_engine
+target_include_directories(
+    ngi541_engine
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
 )
 
 target_link_libraries(
@@ -44,13 +49,20 @@ target_link_libraries(
 )
 
 add_library(
+    NGI541::engine
+    ALIAS ngi541_engine
+)
+
+add_library(
     ngi541_engine_shared SHARED
     $<TARGET_OBJECTS:ngi541_engine_objects>
 )
 
-add_library(
-    NGI541::engine_shared
-    ALIAS ngi541_engine_shared
+target_include_directories(
+    ngi541_engine_shared
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
 )
 
 target_link_libraries(
@@ -63,4 +75,9 @@ set_target_properties(
     ngi541_engine_shared
     PROPERTIES
         OUTPUT_NAME ngi541_engine
+)
+
+add_library(
+    NGI541::engine_shared
+    ALIAS ngi541_engine_shared
 )

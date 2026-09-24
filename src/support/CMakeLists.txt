@@ -18,4 +18,5 @@ set_target_properties(
     ngi541_support
     PROPERTIES
         POSITION_INDEPENDENT_CODE ON
+        C_VISIBILITY_PRESET hidden
 )
