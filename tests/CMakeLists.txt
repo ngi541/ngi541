@@ -48,4 +48,20 @@ if(NGI541_BUILD_ENGINE)
         NAME public.api_runtime
         COMMAND ngi541_public_api_runtime_test
     )
+
+    add_executable(
+        ngi541_sha256_kat_test
+        public/sha256_kat.c
+    )
+
+    target_link_libraries(
+        ngi541_sha256_kat_test
+        PRIVATE
+            NGI541::engine
+    )
+
+    add_test(
+        NAME crypto.sha256_kat
+        COMMAND ngi541_sha256_kat_test
+    )
 endif()
