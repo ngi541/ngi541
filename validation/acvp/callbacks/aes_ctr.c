@@ -48,15 +48,16 @@ ngi541_acvp_aes_ctr_handler (
   if (tc->cipher != ACVP_AES_CTR)
     return 1;
 
-  /*
-   * MCT requires protocol-level orchestration outside the
-   * one-shot public NGI541 execution contract.
-   */
-  if (tc->test_type == ACVP_SYM_TEST_TYPE_MCT)
-    return 1;
-
-  if (tc->key == NULL || tc->iv == NULL)
-    return 1;
+/*
+ * The current NGI541 AES-CTR validation profile supports
+ * Algorithm Functional Tests and Counter Tests only.
+ *
+ * Reject every other test type explicitly rather than
+ * treating unknown values as AFT.
+ */
+if (tc->test_type != ACVP_SYM_TEST_TYPE_AFT &&
+    tc->test_type != ACVP_SYM_TEST_TYPE_CTR)
+  return 1;
 
   /*
    * libacvp exposes the AES key length in bits.

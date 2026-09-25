@@ -218,19 +218,27 @@ ngi541_acvp_register_profile_v1 (
   if (result != ACVP_SUCCESS)
     return result;
 
-  /*
-   * NGI541 does not internally generate GCM IVs.
-   * The ACVP test vector supplies the IV to the callback.
-   */
-  result =
-    acvp_cap_sym_cipher_set_parm (
-      ctx,
-      ACVP_AES_GCM,
-      ACVP_SYM_CIPH_PARM_IVGEN_SRC,
-      ACVP_SYM_CIPH_IVGEN_SRC_EXT);
+/*
+ * NGI541 does not internally generate GCM IVs.
+ * The ACVP test vector supplies the IV to the callback.
+ *
+ * libacvp represents AES-GCM IV source/mode combinations through
+ * iv_mode_matrix. Therefore GCM registration must use
+ * acvp_cap_sym_cipher_set_iv_modes() rather than setting IVGEN_SRC
+ * independently.
+ *
+ * Profile v1 advertises externally supplied IVs using the
+ * deterministic construction method defined by SP 800-38D 8.2.1.
+ */
+result =
+  acvp_cap_sym_cipher_set_iv_modes (
+    ctx,
+    ACVP_AES_GCM,
+    ACVP_SYM_CIPH_IVGEN_MODE_821,
+    ACVP_SYM_CIPH_IVGEN_SRC_EXT);
 
-  if (result != ACVP_SUCCESS)
-    return result;
+if (result != ACVP_SUCCESS)
+  return result;
 
   /*
    * AES key sizes supported by the public NGI541 GCM API.

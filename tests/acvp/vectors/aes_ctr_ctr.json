@@ -1,0 +1,28 @@
+[
+  {
+    "acvVersion": "1.0"
+  },
+  {
+    "vsId": 9002,
+    "algorithm": "ACVP-AES-CTR",
+    "revision": "1.0",
+    "testGroups": [
+      {
+        "tgId": 1,
+        "testType": "CTR",
+        "direction": "encrypt",
+        "keyLen": 128,
+        "incremental": true,
+        "overflow": false,
+        "tests": [
+          {
+            "tcId": 1,
+            "key": "2B7E151628AED2A6ABF7158809CF4F3C",
+            "iv": "F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF",
+            "pt": "6BC1BEE22E409F96E93D7E117393172AAE2D8A571E03AC9C9EB76FAC45AF8E5130C81C46A35CE411E5FBC1191A0A52EFF69F2445DF4F9B17AD2B417BE66C3710"
+          }
+        ]
+      }
+    ]
+  }
+]

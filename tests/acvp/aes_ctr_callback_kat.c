@@ -82,6 +82,7 @@ test_encrypt (void)
   ACVP_TEST_CASE test_case = { 0 };
 
   tc.cipher = ACVP_AES_CTR;
+  tc.test_type = ACVP_SYM_TEST_TYPE_AFT;
   tc.direction = ACVP_SYM_CIPH_DIR_ENCRYPT;
 
   tc.key = (unsigned char *) key;
@@ -134,6 +135,7 @@ test_decrypt (void)
   ACVP_TEST_CASE test_case = { 0 };
 
   tc.cipher = ACVP_AES_CTR;
+  tc.test_type = ACVP_SYM_TEST_TYPE_AFT;
   tc.direction = ACVP_SYM_CIPH_DIR_DECRYPT;
 
   tc.key = (unsigned char *) key;

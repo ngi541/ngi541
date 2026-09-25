@@ -1,0 +1,23 @@
+[
+  {
+    "acvVersion": "1.0"
+  },
+  {
+    "vsId": 9004,
+    "algorithm": "SHA2-256",
+    "revision": "1.0",
+    "testGroups": [
+      {
+        "tgId": 999,
+        "tests": [
+          {
+            "msg": "6F78F96A04C0F0A8DCA565FAAF28CB4BBAF06D5B23410800A5EE8A3B9A79F85F",
+            "tcId": 130
+          }
+        ],
+        "testType": "MCT",
+        "mctVersion": "standard"
+      }
+    ]
+  }
+]

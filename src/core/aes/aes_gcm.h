@@ -649,8 +649,23 @@ aes_gcm_enc (aes_gcm_ctx_t *ctx, const u8 *src, u8 *dst, u32 n_left)
   if (PREDICT_FALSE (n_left == 0))
     {
       int i;
+
+      /*
+      * Empty plaintext still requires GCM authentication
+      * finalization.
+      *
+      * AAD has already been folded into ctx->T by
+      * aes_gcm_ghash(). Finalize GHASH with the mandatory
+      * length block before applying E(K, Y0).
+      */
+      ctx->T =
+        ghash_mul (
+          aes_gcm_final_block (ctx) ^ ctx->T,
+          ctx->Hi[NUM_HI - 1]);
+
       for (i = 0; i < ctx->rounds + 1; i++)
-	aes_gcm_enc_ctr0_round (ctx, i);
+        aes_gcm_enc_ctr0_round (ctx, i);
+
       return;
     }
 

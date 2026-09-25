@@ -34,6 +34,38 @@ if(NGI541_BUILD_ENGINE)
     )
 
     add_executable(
+        ngi541_engine_not_initialized_test
+        public/engine_not_initialized.c
+    )
+
+    target_link_libraries(
+        ngi541_engine_not_initialized_test
+        PRIVATE
+            NGI541::engine
+    )
+
+    add_test(
+        NAME public.engine_not_initialized
+        COMMAND ngi541_engine_not_initialized_test
+    )
+
+    add_executable(
+        ngi541_public_api_validation_test
+        public/api_validation.c
+    )
+
+    target_link_libraries(
+        ngi541_public_api_validation_test
+        PRIVATE
+            NGI541::engine
+    )
+
+    add_test(
+        NAME public.api_validation
+        COMMAND ngi541_public_api_validation_test
+    )
+
+    add_executable(
         ngi541_public_api_runtime_test
         public/api_runtime.c
     )
