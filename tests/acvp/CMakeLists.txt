@@ -92,6 +92,15 @@ add_test(
         "${CMAKE_CURRENT_SOURCE_DIR}/verify_aes_ctr_offline.cmake"
 )
 
+add_test(
+    NAME acvp.registration
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DNGI541_ACVP_RUNNER=$<TARGET_FILE:ngi541_acvp>"
+        -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/verify_registration.cmake"
+)
+
 add_executable(
     ngi541_acvp_sha256_callback_kat
     sha256_callback_kat.c
