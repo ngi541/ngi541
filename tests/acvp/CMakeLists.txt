@@ -102,6 +102,28 @@ add_test(
 )
 
 add_test(
+    NAME acvp.sha256_mct_offline
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DNGI541_ACVP_RUNNER=$<TARGET_FILE:ngi541_acvp>"
+        "-DNGI541_ACVP_REQUEST=${CMAKE_CURRENT_SOURCE_DIR}/vectors/sha256_mct.json"
+        "-DNGI541_ACVP_RESPONSE=${CMAKE_CURRENT_BINARY_DIR}/sha256_mct_response.json"
+        -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/verify_sha256_mct_offline.cmake"
+)
+
+add_test(
+    NAME acvp.sha224_mct_offline
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DNGI541_ACVP_RUNNER=$<TARGET_FILE:ngi541_acvp>"
+        "-DNGI541_ACVP_REQUEST=${CMAKE_CURRENT_SOURCE_DIR}/vectors/sha224_mct.json"
+        "-DNGI541_ACVP_RESPONSE=${CMAKE_CURRENT_BINARY_DIR}/sha224_mct_response.json"
+        -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/verify_sha224_mct_offline.cmake"
+)
+
+add_test(
     NAME acvp.registration
     COMMAND
         ${CMAKE_COMMAND}
