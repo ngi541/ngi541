@@ -96,6 +96,14 @@ jobs:
             --build build \
             --parallel
 
+      - name: Run public API conformance tests
+        run: |
+          ctest \
+            --test-dir build \
+            -R '^public\.(engine_not_initialized|api_validation)$' \
+            --output-on-failure \
+            --no-tests=error
+
       - name: Test
         run: |
           ctest \
@@ -163,9 +171,23 @@ jobs:
             --build build-acvp \
             --parallel
 
-      - name: ACVP registration smoke test
+      - name: ACVP runner smoke test
         run: |
           ./build-acvp/validation/acvp/ngi541_acvp
+    
+      - name: ACVP registration smoke test
+        run: |
+          ./build-acvp/validation/acvp/ngi541_acvp \
+            --registration \
+            > build-acvp/acvp-registration.json
+
+      - name: Run ACVP negative validation tests
+        run: |
+          ctest \
+            --test-dir build-acvp \
+            -R '^acvp\.(aes_gcm_callback_negative|aes_cbc_ctr_callback_negative|sha_callback_negative)$' \
+            --output-on-failure \
+            --no-tests=error
 
       - name: Run full test suite
         run: |
@@ -192,3 +214,4 @@ jobs:
           path: |
             build-acvp/Testing/Temporary/LastTest.log
             build-acvp/tests/acvp/*_response.json
+            build-acvp/acvp-registration.json

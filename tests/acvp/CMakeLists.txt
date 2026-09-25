@@ -31,6 +31,23 @@ add_test(
 )
 
 add_executable(
+    ngi541_acvp_aes_cbc_ctr_callback_negative_test
+    aes_cbc_ctr_callback_negative.c
+)
+
+target_link_libraries(
+    ngi541_acvp_aes_cbc_ctr_callback_negative_test
+    PRIVATE
+        ngi541_acvp_adapter
+)
+
+add_test(
+    NAME acvp.aes_cbc_ctr_callback_negative
+    COMMAND
+        ngi541_acvp_aes_cbc_ctr_callback_negative_test
+)
+
+add_executable(
     ngi541_acvp_aes_gcm_callback_kat_test
     aes_gcm_callback_kat.c
 )
@@ -44,6 +61,23 @@ target_link_libraries(
 add_test(
     NAME acvp.aes_gcm_callback_kat
     COMMAND ngi541_acvp_aes_gcm_callback_kat_test
+)
+
+add_executable(
+    ngi541_acvp_aes_gcm_callback_negative_test
+    aes_gcm_callback_negative.c
+)
+
+target_link_libraries(
+    ngi541_acvp_aes_gcm_callback_negative_test
+    PRIVATE
+        ngi541_acvp_adapter
+)
+
+add_test(
+    NAME acvp.aes_gcm_callback_negative
+    COMMAND
+        ngi541_acvp_aes_gcm_callback_negative_test
 )
 
 add_test(
@@ -173,4 +207,25 @@ target_link_libraries(
 add_test(
     NAME acvp.sha224_callback_kat
     COMMAND ngi541_acvp_sha224_callback_kat
+)
+
+add_executable(
+    ngi541_acvp_sha_callback_negative_test
+
+    sha_callback_negative.c
+)
+
+target_link_libraries(
+    ngi541_acvp_sha_callback_negative_test
+
+    PRIVATE
+
+        ngi541_acvp_adapter
+)
+
+add_test(
+    NAME acvp.sha_callback_negative
+
+    COMMAND
+        ngi541_acvp_sha_callback_negative_test
 )
