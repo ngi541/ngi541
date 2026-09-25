@@ -1,0 +1,99 @@
+[
+    {
+        "algorithm": "ACVP-AES-CBC",
+        "revision": "1.0",
+        "direction": [
+            "encrypt",
+            "decrypt"
+        ],
+        "keyLen": [
+            128,
+            192,
+            256
+        ]
+    },
+    {
+        "algorithm": "ACVP-AES-CTR",
+        "revision": "1.0",
+        "direction": [
+            "encrypt",
+            "decrypt"
+        ],
+        "incrementalCounter": true,
+        "overflowCounter": false,
+        "performCounterTests": true,
+        "keyLen": [
+            128,
+            192,
+            256
+        ],
+        "payloadLen": [
+            {
+                "max": 128,
+                "min": 8,
+                "increment": 8
+            }
+        ]
+    },
+    {
+        "algorithm": "ACVP-AES-GCM",
+        "revision": "1.0",
+        "direction": [
+            "encrypt",
+            "decrypt"
+        ],
+        "ivGen": "external",
+        "ivGenMode": "8.2.1",
+        "keyLen": [
+            128,
+            192,
+            256
+        ],
+        "tagLen": [
+            128
+        ],
+        "ivLen": [
+            {
+                "max": 96,
+                "min": 96,
+                "increment": 8
+            }
+        ],
+        "payloadLen": [
+            {
+                "max": 65536,
+                "min": 0,
+                "increment": 8
+            }
+        ],
+        "aadLen": [
+            {
+                "max": 65536,
+                "min": 0,
+                "increment": 8
+            }
+        ]
+    },
+    {
+        "algorithm": "SHA2-256",
+        "revision": "1.0",
+        "messageLength": [
+            {
+                "min": 0,
+                "max": 65536,
+                "increment": 8
+            }
+        ]
+    },
+    {
+        "algorithm": "SHA2-224",
+        "revision": "1.0",
+        "messageLength": [
+            {
+                "min": 0,
+                "max": 65536,
+                "increment": 8
+            }
+        ]
+    }
+]
