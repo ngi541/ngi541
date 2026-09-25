@@ -1,0 +1,96 @@
+[
+  {
+    "acvVersion": "1.0"
+  },
+  {
+    "vsId": 9003,
+    "algorithm": "ACVP-AES-CBC",
+    "revision": "1.0",
+    "testGroups": [
+      {
+        "testType": "MCT",
+        "keyLen": 128,
+        "tgId": 999,
+        "tests": [
+          {
+            "iv": "BEFDA6FE9B5081A2EE6C0DCA0A3F2EF4",
+            "key": "BFDCEBD27C5FBF998ABF0208745E9D7C",
+            "pt": "6B3E19AB35F09D1CBC6F9AC43E167354",
+            "tcId": 2139
+          }
+        ],
+        "direction": "encrypt"
+      },
+      {
+        "testType": "MCT",
+        "keyLen": 192,
+        "tgId": 999,
+        "tests": [
+          {
+            "iv": "B61BEFAE0B71B56FF1C33888CE116CBB",
+            "key": "1B370DDA66C0F3817FDE89126B57A12DE1F9BF8F8B4690A4",
+            "pt": "FCDBB3D31A9139822C0E64290FCE25B0",
+            "tcId": 2140
+          }
+        ],
+        "direction": "encrypt"
+      },
+      {
+        "testType": "MCT",
+        "keyLen": 256,
+        "tgId": 999,
+        "tests": [
+          {
+            "iv": "96DBB42FBA89F2D6E6DE58E1E7A12F72",
+            "key": "CDFD53DA3739E846573A4F6CAAF4C418CEABC4F7D8E82A92C9B7EAF06ADA2A59",
+            "pt": "11EE056FB755D877880B70D8A8C0FB5E",
+            "tcId": 2141
+          }
+        ],
+        "direction": "encrypt"
+      },
+      {
+        "testType": "MCT",
+        "keyLen": 128,
+        "tgId": 999,
+        "tests": [
+          {
+            "iv": "3EEE80B1072482F00A2A30C06AA1BB46",
+            "ct": "F7D6034C55B8B6D02D0D93B11FF027FA",
+            "key": "40E883F994326CB8A8F50203FC7A1B2C",
+            "tcId": 2142
+          }
+        ],
+        "direction": "decrypt"
+      },
+      {
+        "testType": "MCT",
+        "keyLen": 192,
+        "tgId": 999,
+        "tests": [
+          {
+            "iv": "6D1095FE54B2F9C5430EF18B548A16E9",
+            "ct": "1B674CF668BA4AA53B2FB8E1B859AD18",
+            "key": "08B594F8E3AA3B95B45BA04A4D2B4D0E998CCE8F8A0DE39A",
+            "tcId": 2143
+          }
+        ],
+        "direction": "decrypt"
+      },
+      {
+        "testType": "MCT",
+        "keyLen": 256,
+        "tgId": 999,
+        "tests": [
+          {
+            "iv": "06752DEBC2BEFD9D25F8C1C63E46F189",
+            "ct": "AA40F819D520F139B5A685DBF03BB4D5",
+            "key": "784F6CFAE31A34B45741774E06598FD348BEF3E500A7F01D55B8D475E271052D",
+            "tcId": 2144
+          }
+        ],
+        "direction": "decrypt"
+      }
+    ]
+  }
+]

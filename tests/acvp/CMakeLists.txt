@@ -80,9 +80,7 @@ add_test(
 )
 
 add_test(
-
     NAME acvp.aes_ctr_offline
-
     COMMAND
         ${CMAKE_COMMAND}
         "-DNGI541_ACVP_RUNNER=$<TARGET_FILE:ngi541_acvp>"
@@ -90,6 +88,17 @@ add_test(
         "-DNGI541_ACVP_RESPONSE=${CMAKE_CURRENT_BINARY_DIR}/aes_ctr_ctr_response.json"
         -P
         "${CMAKE_CURRENT_SOURCE_DIR}/verify_aes_ctr_offline.cmake"
+)
+
+add_test(
+    NAME acvp.aes_cbc_mct_offline
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DNGI541_ACVP_RUNNER=$<TARGET_FILE:ngi541_acvp>"
+        "-DNGI541_ACVP_REQUEST=${CMAKE_CURRENT_SOURCE_DIR}/vectors/aes_cbc_mct.json"
+        "-DNGI541_ACVP_RESPONSE=${CMAKE_CURRENT_BINARY_DIR}/aes_cbc_mct_response.json"
+        -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/verify_aes_cbc_mct_offline.cmake"
 )
 
 add_test(
