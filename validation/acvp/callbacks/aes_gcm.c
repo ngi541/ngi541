@@ -48,7 +48,21 @@ ngi541_acvp_aes_gcm_handler (
   if (tc->cipher != ACVP_AES_GCM)
     return 1;
 
-  if (tc->test_type == ACVP_SYM_TEST_TYPE_MCT)
+  /*
+   * NGI541 ACVP profile v1 supports AES-GCM AFT only.
+   */
+  if (tc->test_type != ACVP_SYM_TEST_TYPE_AFT)
+    return 1;
+
+    /*
+    * NGI541 consumes externally supplied GCM IVs.
+    *
+    * pinned libacvp does not propagate ivGenMode into the
+    * test case for externally generated IVs, so the callback
+    * must not validate tc->ivgen_mode here.
+    */
+    if (tc->ivgen_source !=
+        ACVP_SYM_CIPH_IVGEN_SRC_EXT)
     return 1;
 
   if (tc->key == NULL || tc->iv == NULL || tc->tag == NULL)
