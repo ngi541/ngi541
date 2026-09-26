@@ -229,3 +229,12 @@ add_test(
     COMMAND
         ngi541_acvp_sha_callback_negative_test
 )
+
+if(NGI541_ENABLE_ACVP_ONLINE)
+    add_test(
+        NAME acvp.online_build_probe
+
+        COMMAND
+            ngi541_acvp_online_probe
+    )
+endif()

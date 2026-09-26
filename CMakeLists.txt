@@ -48,12 +48,33 @@ option(
     OFF
 )
 
+option(
+    NGI541_ENABLE_ACVP_ONLINE
+    "Build network-enabled ACVTS support"
+    OFF
+)
+
+set(
+    NGI541_ACVP_CURL_ROOT
+    ""
+    CACHE PATH
+    "Optional libcurl installation prefix for online ACVP builds"
+)
+
 # ACVP validation is a consumer of the public NGI541 engine API.
 # It cannot be built without the engine layer.
 if(NGI541_BUILD_ACVP AND NOT NGI541_BUILD_ENGINE)
     message(
         FATAL_ERROR
         "NGI541_BUILD_ACVP requires NGI541_BUILD_ENGINE=ON"
+    )
+endif()
+
+if(NGI541_ENABLE_ACVP_ONLINE AND NOT NGI541_BUILD_ACVP)
+    message(
+        FATAL_ERROR
+        "NGI541_ENABLE_ACVP_ONLINE requires "
+        "NGI541_BUILD_ACVP=ON"
     )
 endif()
 

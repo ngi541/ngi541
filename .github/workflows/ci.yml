@@ -52,6 +52,74 @@ jobs:
             exit 1
           fi
 
+      - name: Verify online ACVP probe is network-free
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          path = Path("validation/acvp/online_build_probe.c")
+          source = path.read_text(encoding="utf-8")
+
+          # Strip C block comments while preserving line numbers.
+          def strip_block_comment(match):
+              return "".join(
+                  "\n" if ch == "\n" else " "
+                  for ch in match.group(0)
+              )
+
+          source = re.sub(
+              r"/\*.*?\*/",
+              strip_block_comment,
+              source,
+              flags=re.DOTALL,
+          )
+
+          # Strip C++-style line comments.
+          source = re.sub(
+              r"//[^\n]*",
+              "",
+              source,
+          )
+
+          forbidden = (
+              "acvp_run",
+              "acvp_set_server",
+              "acvp_set_certkey",
+              "acvp_set_2fa_callback",
+          )
+
+          violations = []
+
+          for name in forbidden:
+              pattern = re.compile(
+                  rf"\b{re.escape(name)}\s*\("
+              )
+
+              for match in pattern.finditer(source):
+                  line = source.count(
+                      "\n",
+                      0,
+                      match.start(),
+                  ) + 1
+
+                  violations.append(
+                      (line, name)
+                  )
+
+          if violations:
+              for line, name in violations:
+                  print(
+                      f"::error file={path},line={line}::"
+                      f"online_build_probe must not call {name}()"
+                  )
+
+              sys.exit(1)
+          PY
 
   build-test:
     name: Core / ${{ matrix.compiler }} / ${{ matrix.build_type }}
@@ -215,3 +283,85 @@ jobs:
             build-acvp/Testing/Temporary/LastTest.log
             build-acvp/tests/acvp/*_response.json
             build-acvp/acvp-registration.json
+            
+  acvp-online-build:
+    name: ACVP Online Build / ${{ matrix.compiler }} / Debug
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install ACVP build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            libssl-dev
+
+      - name: Bootstrap online ACVP dependencies
+        run: |
+          ./scripts/bootstrap-acvp-online-deps.sh
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> "$GITHUB_ENV"
+          else
+            echo "CC=clang" >> "$GITHUB_ENV"
+          fi
+
+      - name: Show pinned libacvp revision
+        run: |
+          git -C third_party/libacvp rev-parse HEAD
+          git submodule status third_party/libacvp
+
+      - name: Show libcurl environment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pkg-config --modversion libcurl
+          pkg-config --variable=prefix libcurl
+          pkg-config --cflags libcurl
+          pkg-config --libs libcurl
+
+      - name: Configure online ACVP build
+        run: |
+          cmake \
+            -S . \
+            -B build-acvp-online \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_ACVP=ON \
+            -DNGI541_ENABLE_ACVP_ONLINE=ON
+
+      - name: Build online ACVP probe
+        run: |
+          cmake \
+            --build build-acvp-online \
+            --target ngi541_acvp_online_probe \
+            --parallel
+
+      - name: Run online ACVP build probe
+        run: |
+          ctest \
+            --test-dir build-acvp-online \
+            -R '^acvp\.online_build_probe$' \
+            --output-on-failure \
+            --no-tests=error
