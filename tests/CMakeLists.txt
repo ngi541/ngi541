@@ -165,3 +165,7 @@ if(NGI541_BUILD_ENGINE)
         add_subdirectory(acvp)
     endif()
 endif()
+
+if(NGI541_BUILD_DIFFERENTIAL_TESTS)
+    add_subdirectory(differential)
+endif()

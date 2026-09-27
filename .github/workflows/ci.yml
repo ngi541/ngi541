@@ -156,6 +156,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DNGI541_BUILD_ENGINE=ON \
             -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
             -DNGI541_BUILD_ACVP=OFF
 
       - name: Build
@@ -179,6 +180,77 @@ jobs:
             --output-on-failure \
             --no-tests=error
 
+  build-test-macos:
+    name: Core / macOS / ${{ matrix.compiler }} / Debug
+    runs-on: macos-15-intel
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: apple-clang
+            cc: /usr/bin/clang
+
+          - compiler: gcc-15
+            cc: gcc-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "CC=${{ matrix.cc }}" >> "$GITHUB_ENV"
+
+          "${{ matrix.cc }}" --version
+
+      - name: Configure OpenSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! brew list --versions openssl@3 >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install openssl@3
+          fi
+
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: |
+          cmake \
+            -S . \
+            -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
+            -DNGI541_BUILD_ACVP=OFF
+
+      - name: Build
+        run: |
+          cmake \
+            --build build \
+            --parallel
+
+      - name: Run differential correctness suite
+        run: |
+          ctest \
+            --test-dir build \
+            -R '^differential\.' \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Run full test suite
+        run: |
+          ctest \
+            --test-dir build \
+            --output-on-failure \
+            --no-tests=error
 
   acvp-validation:
     name: ACVP / ${{ matrix.compiler }} / Debug

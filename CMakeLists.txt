@@ -31,6 +31,12 @@ option(
 )
 
 option(
+    NGI541_BUILD_DIFFERENTIAL_TESTS
+    "Build NGI541 differential correctness tests"
+    OFF
+)
+
+option(
     NGI541_BUILD_ENGINE
     "Build the NGI541 engine layer"
     OFF
@@ -107,4 +113,28 @@ endif()
 if(NGI541_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+if(
+    NGI541_BUILD_DIFFERENTIAL_TESTS
+    AND
+    NOT NGI541_BUILD_TESTS
+)
+    message(
+        FATAL_ERROR
+        "NGI541_BUILD_DIFFERENTIAL_TESTS requires "
+        "NGI541_BUILD_TESTS=ON"
+    )
+endif()
+
+if(
+    NGI541_BUILD_DIFFERENTIAL_TESTS
+    AND
+    NOT NGI541_BUILD_ENGINE
+)
+    message(
+        FATAL_ERROR
+        "NGI541_BUILD_DIFFERENTIAL_TESTS requires "
+        "NGI541_BUILD_ENGINE=ON"
+    )
 endif()
