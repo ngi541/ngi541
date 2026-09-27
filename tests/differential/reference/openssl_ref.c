@@ -843,3 +843,103 @@ out:
 
   return result;
 }
+
+static const EVP_MD *
+ngi541_diff_openssl_sha2_md (
+  unsigned int digest_bits)
+{
+  switch (digest_bits)
+    {
+    case 224:
+      return EVP_sha224 ();
+
+    case 256:
+      return EVP_sha256 ();
+
+    default:
+      return NULL;
+    }
+}
+
+
+int
+ngi541_diff_openssl_sha2_compute (
+  unsigned int digest_bits,
+  const uint8_t *message,
+  size_t message_len,
+  uint8_t *digest,
+  size_t digest_capacity,
+  size_t *digest_len)
+{
+  const EVP_MD *md;
+
+  unsigned int openssl_digest_len;
+  size_t expected_digest_len;
+
+  uint8_t empty_message = 0;
+
+
+  if (digest == NULL ||
+      digest_len == NULL)
+    return 1;
+
+  *digest_len = 0;
+
+
+  if (message_len != 0 &&
+      message == NULL)
+    return 1;
+
+
+  switch (digest_bits)
+    {
+    case 224:
+      expected_digest_len = 28;
+      break;
+
+    case 256:
+      expected_digest_len = 32;
+      break;
+
+    default:
+      return 1;
+    }
+
+
+  if (digest_capacity <
+      expected_digest_len)
+    return 1;
+
+
+  md =
+    ngi541_diff_openssl_sha2_md (
+      digest_bits);
+
+  if (md == NULL)
+    return 1;
+
+
+  openssl_digest_len = 0;
+
+  if (EVP_Digest (
+        message != NULL
+          ? message
+          : &empty_message,
+        message_len,
+        digest,
+        &openssl_digest_len,
+        md,
+        NULL) != 1)
+    return 1;
+
+
+  if ((size_t) openssl_digest_len !=
+      expected_digest_len)
+    return 1;
+
+
+  *digest_len =
+    (size_t) openssl_digest_len;
+
+  return 0;
+}

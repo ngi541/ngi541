@@ -163,3 +163,21 @@ ngi541_diff_reference_aes_gcm_decrypt (
     plaintext_capacity,
     plaintext_len);
 }
+
+int
+ngi541_diff_reference_sha2_compute (
+  unsigned int digest_bits,
+  const uint8_t *message,
+  size_t message_len,
+  uint8_t *digest,
+  size_t digest_capacity,
+  size_t *digest_len)
+{
+  return ngi541_diff_openssl_sha2_compute (
+    digest_bits,
+    message,
+    message_len,
+    digest,
+    digest_capacity,
+    digest_len);
+}

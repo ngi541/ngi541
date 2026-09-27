@@ -130,3 +130,22 @@ add_test(
     NAME differential.aes_gcm
     COMMAND ngi541_diff_aes_gcm
 )
+
+add_executable(
+    ngi541_diff_sha2
+
+    sha2.c
+)
+
+target_link_libraries(
+    ngi541_diff_sha2
+    PRIVATE
+        NGI541::engine
+        ngi541_diff_common
+        ngi541_diff_reference
+)
+
+add_test(
+    NAME differential.sha2
+    COMMAND ngi541_diff_sha2
+)
