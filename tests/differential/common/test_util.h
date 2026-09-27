@@ -16,4 +16,8 @@ size_t ngi541_diff_first_mismatch (
   size_t length);
 
 
+int ngi541_diff_buffer_is_zero (
+  const uint8_t *buffer,
+  size_t length);
+
 #endif

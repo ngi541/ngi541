@@ -111,3 +111,22 @@ add_test(
     NAME differential.aes_ctr
     COMMAND ngi541_diff_aes_ctr
 )
+
+add_executable(
+    ngi541_diff_aes_gcm
+
+    aes_gcm.c
+)
+
+target_link_libraries(
+    ngi541_diff_aes_gcm
+    PRIVATE
+        NGI541::engine
+        ngi541_diff_common
+        ngi541_diff_reference
+)
+
+add_test(
+    NAME differential.aes_gcm
+    COMMAND ngi541_diff_aes_gcm
+)

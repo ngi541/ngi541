@@ -25,3 +25,25 @@ ngi541_diff_first_mismatch (
 
   return length;
 }
+
+int
+ngi541_diff_buffer_is_zero (
+  const uint8_t *buffer,
+  size_t length)
+{
+  size_t index;
+
+  if (length != 0 &&
+      buffer == NULL)
+    return 0;
+
+  for (index = 0;
+       index < length;
+       index++)
+    {
+      if (buffer[index] != 0)
+        return 0;
+    }
+
+  return 1;
+}
