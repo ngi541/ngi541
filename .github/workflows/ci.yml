@@ -516,6 +516,97 @@ jobs:
             build-sanitizer/Testing/Temporary/LastTest.log
             build-sanitizer/CMakeFiles/*.log
 
+  asan-lsan-full:
+    name: ASan+LSan / Linux / Clang / Full Suite
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            libssl-dev
+
+      - name: Prepare sanitizer toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --install \
+            --compiler clang
+
+      - name: Require functional LeakSanitizer
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --check \
+            --compiler clang \
+            --require-lsan
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "CC=clang" >> "$GITHUB_ENV"
+          clang --version
+
+      - name: Configure ASan build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cmake \
+            -S . \
+            -B build-asan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
+            -DNGI541_BUILD_ACVP=OFF \
+            -DNGI541_ENABLE_ASAN=ON \
+            -DNGI541_ENABLE_UBSAN=OFF
+
+      - name: Build
+        run: |
+          cmake \
+            --build build-asan \
+            --parallel
+
+      - name: Run full ASan+LSan test suite
+        shell: bash
+        env:
+          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1:detect_leaks=1"
+          LSAN_OPTIONS: "exitcode=23"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-asan \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Upload ASan diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asan-lsan-full-diagnostics
+          if-no-files-found: ignore
+          path: |
+            build-asan/Testing/Temporary/LastTest.log
+            build-asan/CMakeFiles/*.log
+
   acvp-validation:
     name: ACVP / ${{ matrix.compiler }} / Debug
     runs-on: ubuntu-24.04
