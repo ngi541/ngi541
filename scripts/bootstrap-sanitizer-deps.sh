@@ -5,6 +5,7 @@ set -euo pipefail
 
 MODE="check"
 COMPILER="auto"
+REQUIRE_LSAN=0
 
 
 usage()
@@ -24,6 +25,10 @@ Options:
 
   --compiler <auto|clang|gcc>
       Select the compiler toolchain.
+
+  --require-lsan
+      Require functional LeakSanitizer support.
+      The check fails if integrated leak detection is unavailable.
 
       auto:
         uses CC when set;
@@ -56,6 +61,10 @@ while [ "$#" -gt 0 ]; do
 
         --install)
             MODE="install"
+            ;;
+
+        --require-lsan)
+            REQUIRE_LSAN=1
             ;;
 
         --compiler)
@@ -388,6 +397,120 @@ probe_sanitizer()
     echo "PASS: ${name}"
 }
 
+probe_leak_sanitizer()
+{
+    local source
+    local binary
+    local log
+    local status
+
+    source="${TMPDIR_SANITIZER}/probe-lsan.c"
+    binary="${TMPDIR_SANITIZER}/probe-lsan"
+    log="${TMPDIR_SANITIZER}/probe-lsan.log"
+
+    info "Checking LeakSanitizer"
+
+    cat > "${source}" <<'EOF'
+#include <stdlib.h>
+#include <string.h>
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void
+create_intentional_leak(void)
+{
+    unsigned char *p;
+
+    p = malloc(4096);
+
+    if (p == NULL)
+        abort();
+
+    memset(p, 0xa5, 4096);
+
+    /*
+     * Intentionally leaked.
+     *
+     * This allocation exists only to verify that LeakSanitizer
+     * is actually functional in the current runtime.
+     */
+    p = NULL;
+}
+
+
+int
+main(void)
+{
+    create_intentional_leak();
+
+    return 0;
+}
+EOF
+
+    if ! "${CC_PATH}" \
+        -g \
+        -fno-omit-frame-pointer \
+        -fsanitize=address \
+        "${source}" \
+        -o "${binary}" \
+        >"${log}" 2>&1; then
+
+        cat "${log}" >&2
+
+        fail "LeakSanitizer probe could not be compiled and linked"
+    fi
+
+    set +e
+
+    status=0
+
+    {
+        ASAN_OPTIONS="detect_leaks=1" \
+        LSAN_OPTIONS="exitcode=86" \
+            "${binary}"
+
+        status=$?
+    } >"${log}" 2>&1
+
+    set -e
+
+    if grep -q \
+        "detect_leaks is not supported on this platform" \
+        "${log}"; then
+
+        echo "UNSUPPORTED: LeakSanitizer"
+
+        if [ "${REQUIRE_LSAN}" -eq 1 ]; then
+            echo >&2
+            echo "LeakSanitizer runtime output:" >&2
+            cat "${log}" >&2
+
+            fail \
+                "LeakSanitizer was required, but the current " \
+                "sanitizer runtime does not support leak detection"
+        fi
+
+        return 0
+    fi
+
+    if [ "${status}" -eq 86 ] &&
+       grep -q \
+           "LeakSanitizer: detected memory leaks" \
+           "${log}"; then
+
+        echo "PASS: LeakSanitizer"
+        return 0
+    fi
+
+    echo "error: LeakSanitizer capability probe returned an unexpected result" >&2
+    echo "exit status: ${status}" >&2
+    echo >&2
+
+    cat "${log}" >&2
+
+    return 1
+}
 
 probe_sanitizer \
     "AddressSanitizer" \
@@ -406,6 +529,7 @@ probe_sanitizer \
     -fsanitize=undefined \
     -fno-sanitize-recover=all
 
+probe_leak_sanitizer
 
 echo
 echo "Sanitizer dependency check passed"
