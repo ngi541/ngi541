@@ -607,6 +607,100 @@ jobs:
             build-asan/Testing/Temporary/LastTest.log
             build-asan/CMakeFiles/*.log
 
+  ubsan-full:
+    name: UBSan / Linux / Clang / Full Suite
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            libssl-dev
+
+      - name: Prepare sanitizer toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --install \
+            --compiler clang
+
+      - name: Verify sanitizer toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --check \
+            --compiler clang
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "CC=clang" >> "$GITHUB_ENV"
+          clang --version
+
+      - name: Configure UBSan build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cmake \
+            -S . \
+            -B build-ubsan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
+            -DNGI541_BUILD_ACVP=OFF \
+            -DNGI541_ENABLE_ASAN=OFF \
+            -DNGI541_ENABLE_UBSAN=ON
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cmake \
+            --build build-ubsan \
+            --parallel
+
+      - name: Run full UBSan test suite
+        shell: bash
+        env:
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-ubsan \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Upload UBSan diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubsan-full-diagnostics
+          if-no-files-found: ignore
+          path: |
+            build-ubsan/Testing/Temporary/LastTest.log
+            build-ubsan/compile_commands.json
+            build-ubsan/CMakeFiles/*.log
+
   acvp-validation:
     name: ACVP / ${{ matrix.compiler }} / Debug
     runs-on: ubuntu-24.04
