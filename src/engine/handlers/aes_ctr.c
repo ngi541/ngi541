@@ -238,7 +238,7 @@ aes_ctr_hmac_key_exp (ngi541_crypto_key_op_t kop, aes_ctr_sha2_hmac_key_data_t *
 }
 
 static int
-probe ()
+probe (void)
 {
 #if defined(__VAES__) && defined(__AVX512F__)
   if (clib_cpu_supports_vaes () && clib_cpu_supports_avx512f ())
@@ -263,7 +263,7 @@ probe ()
 }
 
 static int
-aes_ctr_sha2_probe ()
+aes_ctr_sha2_probe (void)
 {
   int r_ctr = -1, r_sha2 = -1;
 
