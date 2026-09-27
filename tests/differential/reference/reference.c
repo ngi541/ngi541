@@ -1,0 +1,98 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (c) 2026 Ivan Ivanets
+ */
+
+#include "reference.h"
+#include "openssl_ref.h"
+
+
+int
+ngi541_diff_reference_aes_cbc_encrypt (
+  const uint8_t *key,
+  size_t key_len,
+  const uint8_t *iv,
+  const uint8_t *plaintext,
+  size_t plaintext_len,
+  uint8_t *ciphertext,
+  size_t ciphertext_capacity,
+  size_t *ciphertext_len)
+{
+  return ngi541_diff_openssl_aes_cbc_encrypt (
+    key,
+    key_len,
+    iv,
+    plaintext,
+    plaintext_len,
+    ciphertext,
+    ciphertext_capacity,
+    ciphertext_len);
+}
+
+
+int
+ngi541_diff_reference_aes_cbc_decrypt (
+  const uint8_t *key,
+  size_t key_len,
+  const uint8_t *iv,
+  const uint8_t *ciphertext,
+  size_t ciphertext_len,
+  uint8_t *plaintext,
+  size_t plaintext_capacity,
+  size_t *plaintext_len)
+{
+  return ngi541_diff_openssl_aes_cbc_decrypt (
+    key,
+    key_len,
+    iv,
+    ciphertext,
+    ciphertext_len,
+    plaintext,
+    plaintext_capacity,
+    plaintext_len);
+}
+
+int
+ngi541_diff_reference_aes_ctr_encrypt (
+  const uint8_t *key,
+  size_t key_len,
+  const uint8_t *iv,
+  const uint8_t *plaintext,
+  size_t plaintext_len,
+  uint8_t *ciphertext,
+  size_t ciphertext_capacity,
+  size_t *ciphertext_len)
+{
+  return ngi541_diff_openssl_aes_ctr_encrypt (
+    key,
+    key_len,
+    iv,
+    plaintext,
+    plaintext_len,
+    ciphertext,
+    ciphertext_capacity,
+    ciphertext_len);
+}
+
+
+int
+ngi541_diff_reference_aes_ctr_decrypt (
+  const uint8_t *key,
+  size_t key_len,
+  const uint8_t *iv,
+  const uint8_t *ciphertext,
+  size_t ciphertext_len,
+  uint8_t *plaintext,
+  size_t plaintext_capacity,
+  size_t *plaintext_len)
+{
+  return ngi541_diff_openssl_aes_ctr_decrypt (
+    key,
+    key_len,
+    iv,
+    ciphertext,
+    ciphertext_len,
+    plaintext,
+    plaintext_capacity,
+    plaintext_len);
+}
