@@ -119,7 +119,7 @@ _ (256)
 #undef _
 
 static int
-probe ()
+probe (void)
 {
 #if defined(__VAES__) && defined(__AVX512F__)
   if (clib_cpu_supports_vpclmulqdq () && clib_cpu_supports_vaes () &&

@@ -183,7 +183,7 @@ decrypt:
 }
 
 static int
-aes_cbc_cpu_probe ()
+aes_cbc_cpu_probe (void)
 {
 #if defined(__VAES__) && defined(__AVX512F__)
   if (clib_cpu_supports_vaes () && clib_cpu_supports_avx512f ())
@@ -208,7 +208,7 @@ aes_cbc_cpu_probe ()
 }
 
 static int
-aes_cbc_sha2_probe ()
+aes_cbc_sha2_probe (void)
 {
   int r_cbc = aes_cbc_cpu_probe ();
   int r_sha2 = sha2_probe ();
