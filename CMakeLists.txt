@@ -92,6 +92,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(NGI541Compiler)
 
+include(NGI541Sanitizers)
+
 # ---------------------------------------------------------------------------
 # Source tree
 # ---------------------------------------------------------------------------
