@@ -501,16 +501,22 @@ u8x16_load_partial (u8 *data, uword n)
       r[0] = *(u32u *) data;
       return (u8x16) r;
     }
-  else if (n > 1)
-    {
-      u16x8 r = {};
-      r[1] = *(u16u *) (data + n - 2);
-      r >>= (4 - n) * 8;
-      r[0] = *(u16u *) data;
-      return (u8x16) r;
-    }
-  else if (n > 0)
-    r[0] = *data;
+    else if (n > 2)
+      {
+        u16x8 r = {};
+        r[1] = *(u16u *) (data + n - 2);
+        r >>= (4 - n) * 8;
+        r[0] = *(u16u *) data;
+        return (u8x16) r;
+      }
+    else if (n == 2)
+      {
+        u16x8 r = {};
+        r[0] = *(u16u *) data;
+        return (u8x16) r;
+      }
+    else if (n > 0)
+      r[0] = *data;
   return r;
 }
 
