@@ -528,17 +528,26 @@ u8x16_store_partial (u8x16 r, u8 *data, uword n)
 #else
   if (n > 7)
     {
-      *(u64u *) (data + n - 8) = ((u64x2) r)[1] << ((16 - n) * 8);
+      if (n > 8)
+        *(u64u *) (data + n - 8) =
+          ((u64x2) r)[1] << ((16 - n) * 8);
+
       *(u64u *) data = ((u64x2) r)[0];
     }
   else if (n > 3)
     {
-      *(u32u *) (data + n - 4) = ((u32x4) r)[1] << ((8 - n) * 8);
+      if (n > 4)
+        *(u32u *) (data + n - 4) =
+          ((u32x4) r)[1] << ((8 - n) * 8);
+
       *(u32u *) data = ((u32x4) r)[0];
     }
   else if (n > 1)
     {
-      *(u16u *) (data + n - 2) = ((u16x8) r)[1] << ((4 - n) * 8);
+      if (n > 2)
+        *(u16u *) (data + n - 2) =
+          (u16) ((u32) ((u16x8) r)[1] << ((4 - n) * 8));
+
       *(u16u *) data = ((u16x8) r)[0];
     }
   else if (n > 0)

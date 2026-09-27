@@ -14,6 +14,22 @@ add_test(
     COMMAND ngi541_core_compile_test
 )
 
+add_executable(
+    ngi541_vector_store_partial_test
+    support/vector_store_partial.c
+)
+
+target_link_libraries(
+    ngi541_vector_store_partial_test
+    PRIVATE
+        NGI541::core
+)
+
+add_test(
+    NAME support.vector_store_partial
+    COMMAND ngi541_vector_store_partial_test
+)
+
 if(NGI541_BUILD_ENGINE)
     add_subdirectory(engine)
 
