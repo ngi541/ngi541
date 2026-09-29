@@ -13,6 +13,8 @@
 
 
 #define NGI541_CTR_MAX_TEST_LENGTH 129
+#define NGI541_TEST_GUARD_SIZE 32
+#define NGI541_TEST_CANARY     0xa5
 
 
 typedef struct
@@ -23,6 +25,16 @@ typedef struct
   size_t size;
   size_t offset;
 } ngi541_test_buffer_t;
+
+typedef struct
+{
+  uint8_t *base;
+  uint8_t *data;
+
+  size_t size;
+  size_t prefix_size;
+  size_t suffix_size;
+} ngi541_guarded_buffer_t;
 
 
 static int
@@ -84,6 +96,146 @@ ngi541_test_buffer_free (
     (ngi541_test_buffer_t) { 0 };
 }
 
+static int
+ngi541_guarded_buffer_allocate (
+  ngi541_guarded_buffer_t *buffer,
+  size_t size,
+  size_t offset)
+{
+  size_t prefix_size;
+  size_t allocation_size;
+
+  if (buffer == NULL)
+    return 1;
+
+  *buffer =
+    (ngi541_guarded_buffer_t) { 0 };
+
+  if (offset >
+      SIZE_MAX - NGI541_TEST_GUARD_SIZE)
+    return 1;
+
+  prefix_size =
+    NGI541_TEST_GUARD_SIZE + offset;
+
+  if (size >
+      SIZE_MAX - prefix_size)
+    return 1;
+
+  allocation_size =
+    prefix_size + size;
+
+  if (NGI541_TEST_GUARD_SIZE >
+      SIZE_MAX - allocation_size)
+    return 1;
+
+  allocation_size +=
+    NGI541_TEST_GUARD_SIZE;
+
+  buffer->base =
+    malloc (allocation_size);
+
+  if (buffer->base == NULL)
+    return 1;
+
+  memset (
+    buffer->base,
+    NGI541_TEST_CANARY,
+    allocation_size);
+
+  buffer->data =
+    buffer->base + prefix_size;
+
+  buffer->size = size;
+  buffer->prefix_size = prefix_size;
+  buffer->suffix_size =
+    NGI541_TEST_GUARD_SIZE;
+
+  return 0;
+}
+
+
+static int
+ngi541_guarded_buffer_verify (
+  const ngi541_guarded_buffer_t *buffer,
+  const char *buffer_name,
+  const char *geometry,
+  size_t length)
+{
+  if (buffer == NULL ||
+      buffer->base == NULL ||
+      buffer_name == NULL ||
+      geometry == NULL)
+    return 1;
+
+  for (
+    size_t i = 0;
+    i < buffer->prefix_size;
+    i++)
+    {
+      if (buffer->base[i] !=
+          NGI541_TEST_CANARY)
+        {
+          fprintf (
+            stderr,
+            "AES-CTR prefix canary modified: "
+            "geometry=%s buffer=%s "
+            "length=%zu offset=%zu "
+            "actual=0x%02x\n",
+            geometry,
+            buffer_name,
+            length,
+            i,
+            buffer->base[i]);
+
+          return 1;
+        }
+    }
+
+  for (
+    size_t i = 0;
+    i < buffer->suffix_size;
+    i++)
+    {
+      uint8_t actual =
+        buffer->data[
+          buffer->size + i];
+
+      if (actual !=
+          NGI541_TEST_CANARY)
+        {
+          fprintf (
+            stderr,
+            "AES-CTR suffix canary modified: "
+            "geometry=%s buffer=%s "
+            "length=%zu offset=%zu "
+            "actual=0x%02x\n",
+            geometry,
+            buffer_name,
+            length,
+            i,
+            actual);
+
+          return 1;
+        }
+    }
+
+  return 0;
+}
+
+
+static void
+ngi541_guarded_buffer_free (
+  ngi541_guarded_buffer_t *buffer)
+{
+  if (buffer == NULL)
+    return;
+
+  free (buffer->base);
+
+  *buffer =
+    (ngi541_guarded_buffer_t) { 0 };
+}
 
 static void
 ngi541_fill_test_data (
@@ -605,6 +757,540 @@ out:
 }
 
 
+static int
+ngi541_run_ctr_canary_case (
+  const char *geometry,
+  size_t length,
+  size_t key_offset,
+  size_t iv_offset,
+  size_t input_offset,
+  size_t output_offset)
+{
+  static const uint8_t key_material[16] =
+  {
+    0x00, 0x01, 0x02, 0x03,
+    0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f,
+  };
+
+  static const uint8_t iv_material[16] =
+  {
+    0xf0, 0xf1, 0xf2, 0xf3,
+    0xf4, 0xf5, 0xf6, 0xf7,
+    0xf8, 0xf9, 0xfa, 0xfb,
+    0xfc, 0xfd, 0xfe, 0xff,
+  };
+
+  uint8_t source[NGI541_CTR_MAX_TEST_LENGTH];
+  uint8_t reference[NGI541_CTR_MAX_TEST_LENGTH];
+
+  ngi541_guarded_buffer_t key = { 0 };
+  ngi541_guarded_buffer_t iv = { 0 };
+
+  ngi541_guarded_buffer_t encrypt_input = { 0 };
+  ngi541_guarded_buffer_t encrypt_output = { 0 };
+
+  ngi541_guarded_buffer_t decrypt_input = { 0 };
+  ngi541_guarded_buffer_t decrypt_output = { 0 };
+
+  ngi541_cipher_request_t request;
+  ngi541_status_t status;
+
+  int result = 1;
+
+
+  if (geometry == NULL ||
+      length > sizeof (source))
+    return 1;
+
+
+  ngi541_fill_test_data (
+    source,
+    sizeof (source));
+
+  memset (
+    reference,
+    0,
+    sizeof (reference));
+
+
+  /*
+   * Produce aligned functional reference.
+   */
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key_material,
+    .key_len = sizeof (key_material),
+
+    .iv = iv_material,
+    .iv_len = sizeof (iv_material),
+
+    .input =
+      length != 0
+        ? source
+        : NULL,
+
+    .input_len = length,
+
+    .output =
+      length != 0
+        ? reference
+        : NULL,
+
+    .output_capacity = length,
+  };
+
+  status =
+    ngi541_crypto_cipher_encrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR canary baseline failed: "
+        "geometry=%s length=%zu status=%d\n",
+        geometry,
+        length,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_allocate (
+        &key,
+        sizeof (key_material),
+        key_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &iv,
+        sizeof (iv_material),
+        iv_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &encrypt_input,
+        length,
+        input_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &encrypt_output,
+        length,
+        output_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &decrypt_input,
+        length,
+        input_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &decrypt_output,
+        length,
+        output_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded allocation failed: "
+        "geometry=%s length=%zu\n",
+        geometry,
+        length);
+
+      goto out;
+    }
+
+
+  memcpy (
+    key.data,
+    key_material,
+    sizeof (key_material));
+
+  memcpy (
+    iv.data,
+    iv_material,
+    sizeof (iv_material));
+
+
+  if (length != 0)
+    {
+      memcpy (
+        encrypt_input.data,
+        source,
+        length);
+
+      memset (
+        encrypt_output.data,
+        0x5a,
+        length);
+
+      memcpy (
+        decrypt_input.data,
+        reference,
+        length);
+
+      memset (
+        decrypt_output.data,
+        0x5a,
+        length);
+    }
+
+
+  /*
+   * Notice that for length == 0 these pointers remain non-NULL.
+   *
+   * Any accidental output write lands directly in the suffix
+   * canary because the logical data region has size zero.
+   */
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key.data,
+    .key_len = sizeof (key_material),
+
+    .iv = iv.data,
+    .iv_len = sizeof (iv_material),
+
+    .input = encrypt_input.data,
+    .input_len = length,
+
+    .output = encrypt_output.data,
+    .output_capacity = length,
+  };
+
+  status =
+    ngi541_crypto_cipher_encrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded encrypt failed: "
+        "geometry=%s length=%zu status=%d\n",
+        geometry,
+        length,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (length != 0 &&
+      memcmp (
+        encrypt_input.data,
+        source,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded encrypt modified input: "
+        "geometry=%s length=%zu\n",
+        geometry,
+        length);
+
+      goto out;
+    }
+
+
+  if (length != 0 &&
+      memcmp (
+        encrypt_output.data,
+        reference,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded ciphertext mismatch: "
+        "geometry=%s length=%zu\n",
+        geometry,
+        length);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        key.data,
+        key_material,
+        sizeof (key_material)) != 0 ||
+      memcmp (
+        iv.data,
+        iv_material,
+        sizeof (iv_material)) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded encrypt modified "
+        "key or IV: geometry=%s length=%zu\n",
+        geometry,
+        length);
+
+      goto out;
+    }
+
+
+#define VERIFY_GUARD(buffer_)                                      \
+  do                                                               \
+    {                                                              \
+      if (ngi541_guarded_buffer_verify (                            \
+            &(buffer_),                                            \
+            #buffer_,                                              \
+            geometry,                                              \
+            length) != 0)                                          \
+        goto out;                                                  \
+    }                                                              \
+  while (0)
+
+  VERIFY_GUARD (key);
+  VERIFY_GUARD (iv);
+  VERIFY_GUARD (encrypt_input);
+  VERIFY_GUARD (encrypt_output);
+
+
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key.data,
+    .key_len = sizeof (key_material),
+
+    .iv = iv.data,
+    .iv_len = sizeof (iv_material),
+
+    .input = decrypt_input.data,
+    .input_len = length,
+
+    .output = decrypt_output.data,
+    .output_capacity = length,
+  };
+
+  status =
+    ngi541_crypto_cipher_decrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded decrypt failed: "
+        "geometry=%s length=%zu status=%d\n",
+        geometry,
+        length,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (length != 0 &&
+      memcmp (
+        decrypt_input.data,
+        reference,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded decrypt modified input: "
+        "geometry=%s length=%zu\n",
+        geometry,
+        length);
+
+      goto out;
+    }
+
+
+  if (length != 0 &&
+      memcmp (
+        decrypt_output.data,
+        source,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded plaintext mismatch: "
+        "geometry=%s length=%zu\n",
+        geometry,
+        length);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        key.data,
+        key_material,
+        sizeof (key_material)) != 0 ||
+      memcmp (
+        iv.data,
+        iv_material,
+        sizeof (iv_material)) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR guarded decrypt modified "
+        "key or IV: geometry=%s length=%zu\n",
+        geometry,
+        length);
+
+      goto out;
+    }
+
+
+  VERIFY_GUARD (key);
+  VERIFY_GUARD (iv);
+  VERIFY_GUARD (decrypt_input);
+  VERIFY_GUARD (decrypt_output);
+
+#undef VERIFY_GUARD
+
+
+  result = 0;
+
+
+out:
+  ngi541_guarded_buffer_free (
+    &decrypt_output);
+
+  ngi541_guarded_buffer_free (
+    &decrypt_input);
+
+  ngi541_guarded_buffer_free (
+    &encrypt_output);
+
+  ngi541_guarded_buffer_free (
+    &encrypt_input);
+
+  ngi541_guarded_buffer_free (
+    &iv);
+
+  ngi541_guarded_buffer_free (
+    &key);
+
+  return result;
+}
+
+static int
+ngi541_run_ctr_zero_length_null_case (void)
+{
+  uint8_t key[16] =
+  {
+    0x00, 0x01, 0x02, 0x03,
+    0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f,
+  };
+
+  uint8_t iv[16] =
+  {
+    0xf0, 0xf1, 0xf2, 0xf3,
+    0xf4, 0xf5, 0xf6, 0xf7,
+    0xf8, 0xf9, 0xfa, 0xfb,
+    0xfc, 0xfd, 0xfe, 0xff,
+  };
+
+  uint8_t expected_key[sizeof (key)];
+  uint8_t expected_iv[sizeof (iv)];
+
+  ngi541_cipher_request_t request;
+  ngi541_status_t status;
+
+
+  memcpy (
+    expected_key,
+    key,
+    sizeof (key));
+
+  memcpy (
+    expected_iv,
+    iv,
+    sizeof (iv));
+
+
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key,
+    .key_len = sizeof (key),
+
+    .iv = iv,
+    .iv_len = sizeof (iv),
+
+    .input = NULL,
+    .input_len = 0,
+
+    .output = NULL,
+    .output_capacity = 0,
+  };
+
+
+  status =
+    ngi541_crypto_cipher_encrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR NULL/zero encrypt failed: "
+        "status=%d\n",
+        (int) status);
+
+      return 1;
+    }
+
+
+  status =
+    ngi541_crypto_cipher_decrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR NULL/zero decrypt failed: "
+        "status=%d\n",
+        (int) status);
+
+      return 1;
+    }
+
+
+  if (memcmp (
+        key,
+        expected_key,
+        sizeof (key)) != 0 ||
+      memcmp (
+        iv,
+        expected_iv,
+        sizeof (iv)) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR NULL/zero modified "
+        "key or IV\n");
+
+      return 1;
+    }
+
+
+  return 0;
+}
+
 int
 main (void)
 {
@@ -628,6 +1314,8 @@ main (void)
 
   size_t exact_size_cases = 0;
   size_t unaligned_cases = 0;
+  size_t canary_cases = 0;
+  size_t zero_null_cases = 0;
 
 
   status =
@@ -743,13 +1431,124 @@ main (void)
         }
     }
 
+  /*
+   * M5.2.4c:
+   * Guarded logical-boundary corpus.
+   *
+   * First repeat the complete aligned length corpus,
+   * including non-NULL zero-length input/output.
+   */
+  for (
+    size_t i = 0;
+    i < sizeof (lengths) / sizeof (lengths[0]);
+    i++)
+    {
+      if (ngi541_run_ctr_canary_case (
+            "canary-aligned",
+            lengths[i],
+            0,
+            0,
+            0,
+            0) != 0)
+        return 1;
+
+      canary_cases++;
+    }
+
+
+  /*
+   * Combine logical guards with each deliberately
+   * unaligned public buffer independently.
+   */
+  for (
+    size_t offset_index = 0;
+    offset_index <
+      sizeof (offsets) / sizeof (offsets[0]);
+    offset_index++)
+    {
+      size_t offset =
+        offsets[offset_index];
+
+      for (
+        size_t length_index = 1;
+        length_index <
+          sizeof (lengths) / sizeof (lengths[0]);
+        length_index++)
+        {
+          size_t length =
+            lengths[length_index];
+
+
+          if (ngi541_run_ctr_canary_case (
+                "canary-unaligned-key",
+                length,
+                offset,
+                0,
+                0,
+                0) != 0)
+            return 1;
+
+          canary_cases++;
+
+
+          if (ngi541_run_ctr_canary_case (
+                "canary-unaligned-iv",
+                length,
+                0,
+                offset,
+                0,
+                0) != 0)
+            return 1;
+
+          canary_cases++;
+
+
+          if (ngi541_run_ctr_canary_case (
+                "canary-unaligned-input",
+                length,
+                0,
+                0,
+                offset,
+                0) != 0)
+            return 1;
+
+          canary_cases++;
+
+
+          if (ngi541_run_ctr_canary_case (
+                "canary-unaligned-output",
+                length,
+                0,
+                0,
+                0,
+                offset) != 0)
+            return 1;
+
+          canary_cases++;
+        }
+    }
+
+
+  if (ngi541_run_ctr_zero_length_null_case () != 0)
+    return 1;
+
+  zero_null_cases++;
 
   printf (
     "AES-CTR buffer geometry passed: "
-    "exact_size=%zu unaligned=%zu total=%zu\n",
+    "exact_size=%zu "
+    "unaligned=%zu "
+    "canary=%zu "
+    "zero_null=%zu "
+    "total=%zu\n",
     exact_size_cases,
     unaligned_cases,
-    exact_size_cases + unaligned_cases);
+    canary_cases,
+    zero_null_cases,
+    exact_size_cases +
+      unaligned_cases +
+      canary_cases +
+      zero_null_cases);
 
   return 0;
 }
