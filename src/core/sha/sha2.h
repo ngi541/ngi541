@@ -555,17 +555,18 @@ clib_sha2_final_internal (clib_sha2_state_t *st, u8 block_size, u8 digest_size,
     {
       clib_sha512_block (st, st->pending.as_u8, 1);
       for (i = 0; i < digest_size / sizeof (u64); i++)
-	((u64 *) digest)[i] = clib_net_to_host_u64 (st->h.h64[i]);
+	((u64u *) digest)[i] = clib_net_to_host_u64 (st->h.h64[i]);
 
       /* sha512-224 case - write half of u64 */
       if (i * sizeof (u64) < digest_size)
-	((u32 *) digest)[2 * i] = clib_net_to_host_u32 (st->h.h64[i] >> 32);
+	((u32u *) digest)[2 * i] = clib_net_to_host_u32 (st->h.h64[i] >> 32);
     }
   else
     {
       clib_sha256_block (st, st->pending.as_u8, 1);
       for (i = 0; i < digest_size / sizeof (u32); i++)
-	*((u32 *) digest + i) = clib_net_to_host_u32 (st->h.h32[i]);
+        ((u32u *) digest)[i] =
+          clib_net_to_host_u32 (st->h.h32[i]);
     }
 }
 

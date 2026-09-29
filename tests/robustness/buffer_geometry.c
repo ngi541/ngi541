@@ -18,6 +18,8 @@
 #define NGI541_GCM_MAX_AAD_LENGTH     33
 #define NGI541_GCM_IV_LENGTH          12
 #define NGI541_GCM_TAG_LENGTH         16
+#define NGI541_SHA2_MAX_MESSAGE_LENGTH 257
+#define NGI541_SHA2_MAX_DIGEST_LENGTH   32
 #define NGI541_TEST_GUARD_SIZE 32
 #define NGI541_TEST_CANARY     0xa5
 
@@ -46,6 +48,13 @@ typedef struct
   size_t plaintext_len;
   size_t aad_len;
 } ngi541_gcm_geometry_case_t;
+
+typedef struct
+{
+  ngi541_hash_algorithm_t algorithm;
+  const char *name;
+  size_t digest_len;
+} ngi541_hash_geometry_algorithm_t;
 
 static int
 ngi541_test_buffer_allocate_suffix_exact (
@@ -403,6 +412,465 @@ ngi541_make_gcm_reference (
   return 0;
 }
 
+static int
+ngi541_make_hash_reference (
+  ngi541_hash_algorithm_t algorithm,
+  const uint8_t *message,
+  size_t message_len,
+  uint8_t *digest,
+  size_t digest_len)
+{
+  ngi541_hash_request_t request;
+  ngi541_status_t status;
+
+
+  request = (ngi541_hash_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_hash_request_t),
+
+    .algorithm = algorithm,
+
+    .message =
+      message_len != 0
+        ? message
+        : NULL,
+
+    .message_len =
+      message_len,
+
+    .digest = digest,
+    .digest_capacity =
+      digest_len,
+  };
+
+
+  status =
+    ngi541_crypto_hash_compute (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "SHA2 baseline failed: "
+        "algorithm=%u message_len=%zu "
+        "digest_len=%zu status=%d\n",
+        (unsigned int) algorithm,
+        message_len,
+        digest_len,
+        (int) status);
+
+      return 1;
+    }
+
+
+  return 0;
+}
+
+static int
+ngi541_run_hash_exact_case (
+  const char *geometry,
+  ngi541_hash_algorithm_t algorithm,
+  const char *algorithm_name,
+  size_t digest_len,
+  size_t message_len,
+  size_t message_offset,
+  size_t digest_offset)
+{
+  uint8_t source[
+    NGI541_SHA2_MAX_MESSAGE_LENGTH];
+
+  uint8_t reference[
+    NGI541_SHA2_MAX_DIGEST_LENGTH];
+
+  ngi541_test_buffer_t message = { 0 };
+  ngi541_test_buffer_t digest = { 0 };
+
+  ngi541_hash_request_t request;
+  ngi541_status_t status;
+
+  int result = 1;
+
+
+  if (geometry == NULL ||
+      algorithm_name == NULL ||
+      message_len >
+        NGI541_SHA2_MAX_MESSAGE_LENGTH ||
+      digest_len >
+        NGI541_SHA2_MAX_DIGEST_LENGTH)
+    return 1;
+
+
+  if ((algorithm == NGI541_HASH_SHA2_224 &&
+       digest_len != 28) ||
+      (algorithm == NGI541_HASH_SHA2_256 &&
+       digest_len != 32) ||
+      (algorithm != NGI541_HASH_SHA2_224 &&
+       algorithm != NGI541_HASH_SHA2_256))
+    return 1;
+
+
+  /*
+   * Exact-size zero-length representation is NULL,
+   * therefore it has no alignment.
+   */
+  if (message_len == 0 &&
+      message_offset != 0)
+    return 1;
+
+
+  ngi541_fill_test_data (
+    source,
+    sizeof (source));
+
+  memset (
+    reference,
+    0,
+    sizeof (reference));
+
+
+  if (ngi541_make_hash_reference (
+        algorithm,
+        source,
+        message_len,
+        reference,
+        digest_len) != 0)
+    goto out;
+
+
+  if (ngi541_test_buffer_allocate_suffix_exact (
+        &message,
+        message_len,
+        message_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &digest,
+        digest_len,
+        digest_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "SHA2 exact allocation failed: "
+        "algorithm=%s message_len=%zu "
+        "message_offset=%zu digest_offset=%zu\n",
+        algorithm_name,
+        message_len,
+        message_offset,
+        digest_offset);
+
+      goto out;
+    }
+
+
+  if (message_len != 0)
+    memcpy (
+      message.data,
+      source,
+      message_len);
+
+  memset (
+    digest.data,
+    0x5a,
+    digest_len);
+
+
+  request = (ngi541_hash_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_hash_request_t),
+
+    .algorithm = algorithm,
+
+    .message = message.data,
+    .message_len = message_len,
+
+    .digest = digest.data,
+    .digest_capacity = digest_len,
+  };
+
+
+  status =
+    ngi541_crypto_hash_compute (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "SHA2 exact/unaligned hash failed: "
+        "geometry=%s algorithm=%s "
+        "message_len=%zu "
+        "message_offset=%zu digest_offset=%zu "
+        "status=%d\n",
+        geometry,
+        algorithm_name,
+        message_len,
+        message_offset,
+        digest_offset,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        digest.data,
+        reference,
+        digest_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "SHA2 digest mismatch: "
+        "geometry=%s algorithm=%s "
+        "message_len=%zu "
+        "message_offset=%zu digest_offset=%zu\n",
+        geometry,
+        algorithm_name,
+        message_len,
+        message_offset,
+        digest_offset);
+
+      goto out;
+    }
+
+
+  if (message_len != 0 &&
+      memcmp (
+        message.data,
+        source,
+        message_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "SHA2 modified message input: "
+        "geometry=%s algorithm=%s "
+        "message_len=%zu\n",
+        geometry,
+        algorithm_name,
+        message_len);
+
+      goto out;
+    }
+
+
+  result = 0;
+
+
+out:
+  ngi541_test_buffer_free (
+    &digest);
+
+  ngi541_test_buffer_free (
+    &message);
+
+  return result;
+}
+
+static int
+ngi541_run_hash_canary_case (
+  const char *geometry,
+  ngi541_hash_algorithm_t algorithm,
+  const char *algorithm_name,
+  size_t digest_len,
+  size_t message_len,
+  size_t message_offset,
+  size_t digest_offset)
+{
+  uint8_t source[
+    NGI541_SHA2_MAX_MESSAGE_LENGTH];
+
+  uint8_t reference[
+    NGI541_SHA2_MAX_DIGEST_LENGTH];
+
+  ngi541_guarded_buffer_t message = { 0 };
+  ngi541_guarded_buffer_t digest = { 0 };
+
+  ngi541_hash_request_t request;
+  ngi541_status_t status;
+
+  int result = 1;
+
+
+  if (geometry == NULL ||
+      algorithm_name == NULL ||
+      message_len >
+        NGI541_SHA2_MAX_MESSAGE_LENGTH ||
+      digest_len >
+        NGI541_SHA2_MAX_DIGEST_LENGTH)
+    return 1;
+
+
+  if ((algorithm == NGI541_HASH_SHA2_224 &&
+       digest_len != 28) ||
+      (algorithm == NGI541_HASH_SHA2_256 &&
+       digest_len != 32) ||
+      (algorithm != NGI541_HASH_SHA2_224 &&
+       algorithm != NGI541_HASH_SHA2_256))
+    return 1;
+
+
+  ngi541_fill_test_data (
+    source,
+    sizeof (source));
+
+  memset (
+    reference,
+    0,
+    sizeof (reference));
+
+
+  if (ngi541_make_hash_reference (
+        algorithm,
+        source,
+        message_len,
+        reference,
+        digest_len) != 0)
+    goto out;
+
+
+  if (ngi541_guarded_buffer_allocate (
+        &message,
+        message_len,
+        message_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &digest,
+        digest_len,
+        digest_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "SHA2 guarded allocation failed: "
+        "algorithm=%s message_len=%zu "
+        "message_offset=%zu digest_offset=%zu\n",
+        algorithm_name,
+        message_len,
+        message_offset,
+        digest_offset);
+
+      goto out;
+    }
+
+
+  if (message_len != 0)
+    memcpy (
+      message.data,
+      source,
+      message_len);
+
+  memset (
+    digest.data,
+    0x5a,
+    digest_len);
+
+
+  /*
+   * For message_len == 0 message.data deliberately remains
+   * non-NULL and points directly at a zero-sized logical region.
+   */
+  request = (ngi541_hash_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_hash_request_t),
+
+    .algorithm = algorithm,
+
+    .message = message.data,
+    .message_len = message_len,
+
+    .digest = digest.data,
+    .digest_capacity = digest_len,
+  };
+
+
+  status =
+    ngi541_crypto_hash_compute (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "SHA2 guarded hash failed: "
+        "geometry=%s algorithm=%s "
+        "message_len=%zu "
+        "message_offset=%zu digest_offset=%zu "
+        "status=%d\n",
+        geometry,
+        algorithm_name,
+        message_len,
+        message_offset,
+        digest_offset,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        digest.data,
+        reference,
+        digest_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "SHA2 guarded digest mismatch: "
+        "geometry=%s algorithm=%s "
+        "message_len=%zu\n",
+        geometry,
+        algorithm_name,
+        message_len);
+
+      goto out;
+    }
+
+
+  if (message_len != 0 &&
+      memcmp (
+        message.data,
+        source,
+        message_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "SHA2 guarded hash modified message: "
+        "geometry=%s algorithm=%s "
+        "message_len=%zu\n",
+        geometry,
+        algorithm_name,
+        message_len);
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_verify (
+        &message,
+        "message",
+        geometry,
+        message_len) != 0)
+    goto out;
+
+
+  if (ngi541_guarded_buffer_verify (
+        &digest,
+        "digest",
+        geometry,
+        message_len) != 0)
+    goto out;
+
+
+  result = 0;
+
+
+out:
+  ngi541_guarded_buffer_free (
+    &digest);
+
+  ngi541_guarded_buffer_free (
+    &message);
+
+  return result;
+}
 
 static int
 ngi541_run_ctr_geometry_case (
@@ -4581,6 +5049,49 @@ main (void)
     32,
   };
 
+    static const ngi541_hash_geometry_algorithm_t
+    hash_algorithms[] =
+    {
+    {
+        NGI541_HASH_SHA2_224,
+        "SHA2-224",
+        28,
+    },
+    {
+        NGI541_HASH_SHA2_256,
+        "SHA2-256",
+        32,
+    },
+    };
+
+    static const size_t hash_lengths[] =
+    {
+    0,
+    1,
+
+    /*
+    * SHA-224/SHA-256 use 64-byte blocks with an
+    * 8-byte encoded message length in final padding.
+    */
+    55,
+    56,
+
+    63,
+    64,
+    65,
+
+    119,
+    120,
+
+    127,
+    128,
+    129,
+
+    255,
+    256,
+    257,
+    };
+
     static const ngi541_gcm_geometry_case_t
     gcm_cases[] =
     {
@@ -4674,6 +5185,9 @@ main (void)
   size_t gcm_unaligned_cases = 0;
   size_t gcm_canary_cases = 0;
   size_t gcm_auth_failure_cases_run = 0;
+  size_t hash_exact_size_cases = 0;
+  size_t hash_unaligned_cases = 0;
+  size_t hash_canary_cases = 0;
 
 
   status =
@@ -5959,6 +6473,214 @@ for (
       }
   }  
 
+/*
+ * M5.2.4e.4 — SHA2-224 / SHA2-256.
+ *
+ * Aligned exact-size message and exact-size digest.
+ */
+for (
+  size_t algorithm_index = 0;
+  algorithm_index <
+    sizeof (hash_algorithms) /
+      sizeof (hash_algorithms[0]);
+  algorithm_index++)
+  {
+    const ngi541_hash_geometry_algorithm_t *hash =
+      &hash_algorithms[algorithm_index];
+
+    for (
+      size_t length_index = 0;
+      length_index <
+        sizeof (hash_lengths) /
+          sizeof (hash_lengths[0]);
+      length_index++)
+      {
+        size_t message_len =
+          hash_lengths[length_index];
+
+
+        if (ngi541_run_hash_exact_case (
+              "sha2-exact",
+              hash->algorithm,
+              hash->name,
+              hash->digest_len,
+              message_len,
+              0,
+              0) != 0)
+          return 1;
+
+        hash_exact_size_cases++;
+      }
+  }
+
+/*
+ * Deliberately unalign one public hash buffer at a time.
+ */
+for (
+  size_t algorithm_index = 0;
+  algorithm_index <
+    sizeof (hash_algorithms) /
+      sizeof (hash_algorithms[0]);
+  algorithm_index++)
+  {
+    const ngi541_hash_geometry_algorithm_t *hash =
+      &hash_algorithms[algorithm_index];
+
+    for (
+      size_t offset_index = 0;
+      offset_index <
+        sizeof (offsets) /
+          sizeof (offsets[0]);
+      offset_index++)
+      {
+        size_t offset =
+          offsets[offset_index];
+
+        for (
+          size_t length_index = 0;
+          length_index <
+            sizeof (hash_lengths) /
+              sizeof (hash_lengths[0]);
+          length_index++)
+          {
+            size_t message_len =
+              hash_lengths[length_index];
+
+
+            /*
+             * Digest always exists, including empty-message hash.
+             */
+            if (ngi541_run_hash_exact_case (
+                  "sha2-unaligned-digest",
+                  hash->algorithm,
+                  hash->name,
+                  hash->digest_len,
+                  message_len,
+                  0,
+                  offset) != 0)
+              return 1;
+
+            hash_unaligned_cases++;
+
+
+            /*
+             * NULL zero-length message has no physical alignment.
+             */
+            if (message_len != 0)
+              {
+                if (ngi541_run_hash_exact_case (
+                      "sha2-unaligned-message",
+                      hash->algorithm,
+                      hash->name,
+                      hash->digest_len,
+                      message_len,
+                      offset,
+                      0) != 0)
+                  return 1;
+
+                hash_unaligned_cases++;
+              }
+          }
+      }
+  }
+
+for (
+  size_t algorithm_index = 0;
+  algorithm_index <
+    sizeof (hash_algorithms) /
+      sizeof (hash_algorithms[0]);
+  algorithm_index++)
+  {
+    const ngi541_hash_geometry_algorithm_t *hash =
+      &hash_algorithms[algorithm_index];
+
+    for (
+      size_t length_index = 0;
+      length_index <
+        sizeof (hash_lengths) /
+          sizeof (hash_lengths[0]);
+      length_index++)
+      {
+        size_t message_len =
+          hash_lengths[length_index];
+
+
+        if (ngi541_run_hash_canary_case (
+              "sha2-canary",
+              hash->algorithm,
+              hash->name,
+              hash->digest_len,
+              message_len,
+              0,
+              0) != 0)
+          return 1;
+
+        hash_canary_cases++;
+      }
+  }
+
+for (
+  size_t algorithm_index = 0;
+  algorithm_index <
+    sizeof (hash_algorithms) /
+      sizeof (hash_algorithms[0]);
+  algorithm_index++)
+  {
+    const ngi541_hash_geometry_algorithm_t *hash =
+      &hash_algorithms[algorithm_index];
+
+    for (
+      size_t offset_index = 0;
+      offset_index <
+        sizeof (offsets) /
+          sizeof (offsets[0]);
+      offset_index++)
+      {
+        size_t offset =
+          offsets[offset_index];
+
+        for (
+          size_t length_index = 0;
+          length_index <
+            sizeof (hash_lengths) /
+              sizeof (hash_lengths[0]);
+          length_index++)
+          {
+            size_t message_len =
+              hash_lengths[length_index];
+
+
+            if (ngi541_run_hash_canary_case (
+                  "sha2-canary-digest",
+                  hash->algorithm,
+                  hash->name,
+                  hash->digest_len,
+                  message_len,
+                  0,
+                  offset) != 0)
+              return 1;
+
+            hash_canary_cases++;
+
+
+            if (message_len != 0)
+              {
+                if (ngi541_run_hash_canary_case (
+                      "sha2-canary-message",
+                      hash->algorithm,
+                      hash->name,
+                      hash->digest_len,
+                      message_len,
+                      offset,
+                      0) != 0)
+                  return 1;
+
+                hash_canary_cases++;
+              }
+          }
+      }
+  }
+
   printf (
     "AES-CTR buffer geometry passed: "
     "exact_size=%zu "
@@ -6027,6 +6749,20 @@ for (
         gcm_unaligned_cases +
         gcm_canary_cases +
         gcm_auth_failure_cases_run);
+
+  printf (
+    "SHA2 buffer geometry passed: "
+    "algorithms=SHA2-224/SHA2-256 "
+    "exact_size=%zu "
+    "unaligned=%zu "
+    "canary=%zu "
+    "total=%zu\n",
+    hash_exact_size_cases,
+    hash_unaligned_cases,
+    hash_canary_cases,
+    hash_exact_size_cases +
+        hash_unaligned_cases +
+        hash_canary_cases);
 
   return 0;
 }
