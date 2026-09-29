@@ -99,6 +99,15 @@ enum
  * input and output must refer to valid buffers for input_len bytes.
  * output_capacity must be at least input_len.
  *
+ * AES-CTR supports exact in-place operation when input == output.
+ *
+ * For AES-CTR, distinct input and output buffers must not partially
+ * overlap over the input_len-byte operation region. Partial overlap
+ * is rejected with NGI541_STATUS_INVALID_ARGUMENT.
+ *
+ * No in-place or overlap guarantee is currently made for other
+ * cipher algorithms.
+ *
  * The request structure is caller-owned and is not retained by NGI541.
  */
 typedef struct

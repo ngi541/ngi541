@@ -53,6 +53,48 @@ ngi541_secure_zero (void *ptr, size_t len)
     }
 }
 
+static bool
+ngi541_ranges_partially_overlap (
+  const void *first,
+  const void *second,
+  size_t length)
+{
+  uintptr_t first_address;
+  uintptr_t second_address;
+
+  /*
+   * Empty ranges never overlap.
+   *
+   * Exact aliasing is deliberately excluded here because AES-CTR
+   * supports input == output as a defined public API operation.
+   */
+  if (length == 0 ||
+      first == NULL ||
+      second == NULL ||
+      first == second)
+    return false;
+
+  /*
+   * Compare integer representations rather than unrelated C
+   * pointers. Avoid computing address + length so that the overlap
+   * check itself cannot wrap at the end of the address space.
+   */
+  first_address =
+    (uintptr_t) first;
+
+  second_address =
+    (uintptr_t) second;
+
+  if (first_address < second_address)
+    return
+      second_address - first_address <
+      length;
+
+  return
+    first_address - second_address <
+    length;
+}
+
 
 static ngi541_status_t
 ngi541_engine_ready_status (void)
@@ -574,6 +616,22 @@ ngi541_execute_cipher (
   if (request->algorithm ==
         NGI541_CIPHER_AES_CBC &&
       (request->input_len % 16) != 0)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  /*
+   * AES-CTR supports exact in-place operation but not partial
+   * input/output aliasing.
+   *
+   * Check only the input_len bytes that the operation actually
+   * reads and writes. output_capacity may be larger than the
+   * operation region and does not extend the overlap contract.
+   */
+  if (request->algorithm ==
+        NGI541_CIPHER_AES_CTR &&
+      ngi541_ranges_partially_overlap (
+        request->input,
+        request->output,
+        request->input_len))
     return NGI541_STATUS_INVALID_ARGUMENT;
 
   ngi541_prepare_operation (
