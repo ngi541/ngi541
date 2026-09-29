@@ -52,6 +52,66 @@ jobs:
             exit 1
           fi
 
+      - name: Verify sanitizer policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git grep -nE \
+            'no_sanitize|no_sanitize_address|no_sanitize_undefined' \
+            -- \
+            src \
+            include \
+            tests \
+            cmake \
+            scripts \
+            CMakeLists.txt; then
+            echo "::error::NGI541 code must not disable sanitizer instrumentation"
+            exit 1
+          fi
+
+          if git grep -nE \
+            'suppressions[[:space:]]*=' \
+            -- \
+            src \
+            include \
+            tests \
+            cmake \
+            scripts \
+            CMakeLists.txt; then
+            echo "::error::NGI541 sanitizer suppressions are not permitted"
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+
+          needle = "suppres" + "sions="
+
+          violations = []
+
+          for path in Path(".github/workflows").glob("*.y*ml"):
+              for line_number, line in enumerate(
+                  path.read_text(encoding="utf-8").splitlines(),
+                  1,
+              ):
+                  if needle in line:
+                      violations.append(
+                          (path, line_number, line.strip())
+                      )
+
+          if violations:
+              for path, line_number, line in violations:
+                  print(
+                      f"::error file={path},line={line_number}::"
+                      f"sanitizer suppression option is not permitted: "
+                      f"{line}"
+                  )
+
+              sys.exit(1)
+          PY
+
       - name: Verify online ACVP probe is network-free
         shell: bash
         run: |
@@ -584,6 +644,33 @@ jobs:
             --build build-asan \
             --parallel
 
+      - name: Run UBSan buffer geometry regression gate
+        shell: bash
+        env:
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-ubsan \
+            -R '^robustness\.buffer_geometry$' \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Run ASan+LSan buffer geometry regression gate
+        shell: bash
+        env:
+          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1:detect_leaks=1"
+          LSAN_OPTIONS: "exitcode=23"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-asan \
+            -R '^robustness\.buffer_geometry$' \
+            --output-on-failure \
+            --no-tests=error
+
       - name: Run full ASan+LSan test suite
         shell: bash
         env:
@@ -700,6 +787,115 @@ jobs:
             build-ubsan/Testing/Temporary/LastTest.log
             build-ubsan/compile_commands.json
             build-ubsan/CMakeFiles/*.log
+
+  asan-ubsan-full:
+    name: ASan+UBSan / Linux / Clang / Full Suite
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            libssl-dev
+
+      - name: Prepare sanitizer toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --install \
+            --compiler clang
+
+      - name: Verify sanitizer toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --check \
+            --compiler clang
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "CC=clang" >> "$GITHUB_ENV"
+          clang --version
+
+      - name: Configure ASan+UBSan build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cmake \
+            -S . \
+            -B build-asan-ubsan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
+            -DNGI541_BUILD_ACVP=OFF \
+            -DNGI541_ENABLE_ASAN=ON \
+            -DNGI541_ENABLE_UBSAN=ON
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cmake \
+            --build build-asan-ubsan \
+            --parallel
+
+      - name: Run ASan+UBSan buffer geometry regression gate
+        shell: bash
+        env:
+          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-asan-ubsan \
+            -R '^robustness\.buffer_geometry$' \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Run full ASan+UBSan test suite
+        shell: bash
+        env:
+          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-asan-ubsan \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Upload ASan+UBSan diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asan-ubsan-full-diagnostics
+          if-no-files-found: ignore
+          path: |
+            build-asan-ubsan/Testing/Temporary/LastTest.log
+            build-asan-ubsan/compile_commands.json
+            build-asan-ubsan/CMakeFiles/*.log
 
   acvp-validation:
     name: ACVP / ${{ matrix.compiler }} / Debug
