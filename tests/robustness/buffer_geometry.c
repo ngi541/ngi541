@@ -318,19 +318,24 @@ ngi541_make_cbc_reference (
 static int
 ngi541_run_ctr_geometry_case (
   const char *geometry,
+  size_t key_len,
   size_t length,
   size_t key_offset,
   size_t iv_offset,
   size_t input_offset,
   size_t output_offset)
 {
-  static const uint8_t key_material[16] =
-  {
+    static const uint8_t key_material[32] =
+    {
     0x00, 0x01, 0x02, 0x03,
     0x04, 0x05, 0x06, 0x07,
     0x08, 0x09, 0x0a, 0x0b,
     0x0c, 0x0d, 0x0e, 0x0f,
-  };
+    0x10, 0x11, 0x12, 0x13,
+    0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1a, 0x1b,
+    0x1c, 0x1d, 0x1e, 0x1f,
+    };
 
   static const uint8_t iv_material[16] =
   {
@@ -357,6 +362,10 @@ ngi541_run_ctr_geometry_case (
 
   int result = 1;
 
+    if (key_len != 16 &&
+        key_len != 24 &&
+        key_len != 32)
+    return 1;
 
   if (geometry == NULL ||
       length > sizeof (source))
@@ -414,7 +423,7 @@ ngi541_run_ctr_geometry_case (
       NGI541_CIPHER_AES_CTR,
 
     .key = key_material,
-    .key_len = sizeof (key_material),
+    .key_len = key_len,
 
     .iv = iv_material,
     .iv_len = sizeof (iv_material),
@@ -461,7 +470,7 @@ ngi541_run_ctr_geometry_case (
    */
   if (ngi541_test_buffer_allocate_suffix_exact (
         &key,
-        sizeof (key_material),
+        key_len,
         key_offset) != 0)
     {
       fprintf (
@@ -557,7 +566,7 @@ ngi541_run_ctr_geometry_case (
   memcpy (
     key.data,
     key_material,
-    sizeof (key_material));
+    key_len);
 
   memcpy (
     iv.data,
@@ -601,7 +610,7 @@ ngi541_run_ctr_geometry_case (
       NGI541_CIPHER_AES_CTR,
 
     .key = key.data,
-    .key_len = sizeof (key_material),
+    .key_len = key_len,
 
     .iv = iv.data,
     .iv_len = sizeof (iv_material),
@@ -691,7 +700,7 @@ ngi541_run_ctr_geometry_case (
       NGI541_CIPHER_AES_CTR,
 
     .key = key.data,
-    .key_len = sizeof (key_material),
+    .key_len = key_len,
 
     .iv = iv.data,
     .iv_len = sizeof (iv_material),
@@ -767,7 +776,7 @@ ngi541_run_ctr_geometry_case (
   if (memcmp (
         key.data,
         key_material,
-        sizeof (key_material)) != 0)
+        key_len) != 0)
     {
       fprintf (
         stderr,
@@ -825,19 +834,24 @@ out:
 static int
 ngi541_run_ctr_canary_case (
   const char *geometry,
+  size_t key_len,
   size_t length,
   size_t key_offset,
   size_t iv_offset,
   size_t input_offset,
   size_t output_offset)
 {
-  static const uint8_t key_material[16] =
-  {
+    static const uint8_t key_material[32] =
+    {
     0x00, 0x01, 0x02, 0x03,
     0x04, 0x05, 0x06, 0x07,
     0x08, 0x09, 0x0a, 0x0b,
     0x0c, 0x0d, 0x0e, 0x0f,
-  };
+    0x10, 0x11, 0x12, 0x13,
+    0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1a, 0x1b,
+    0x1c, 0x1d, 0x1e, 0x1f,
+    };
 
   static const uint8_t iv_material[16] =
   {
@@ -864,6 +878,10 @@ ngi541_run_ctr_canary_case (
 
   int result = 1;
 
+    if (key_len != 16 &&
+        key_len != 24 &&
+        key_len != 32)
+    return 1;
 
   if (geometry == NULL ||
       length > sizeof (source))
@@ -892,7 +910,7 @@ ngi541_run_ctr_canary_case (
       NGI541_CIPHER_AES_CTR,
 
     .key = key_material,
-    .key_len = sizeof (key_material),
+    .key_len = key_len,
 
     .iv = iv_material,
     .iv_len = sizeof (iv_material),
@@ -932,7 +950,7 @@ ngi541_run_ctr_canary_case (
 
   if (ngi541_guarded_buffer_allocate (
         &key,
-        sizeof (key_material),
+        key_len,
         key_offset) != 0 ||
       ngi541_guarded_buffer_allocate (
         &iv,
@@ -969,7 +987,7 @@ ngi541_run_ctr_canary_case (
   memcpy (
     key.data,
     key_material,
-    sizeof (key_material));
+    key_len);
 
   memcpy (
     iv.data,
@@ -1016,7 +1034,7 @@ ngi541_run_ctr_canary_case (
       NGI541_CIPHER_AES_CTR,
 
     .key = key.data,
-    .key_len = sizeof (key_material),
+    .key_len = key_len,
 
     .iv = iv.data,
     .iv_len = sizeof (iv_material),
@@ -1083,7 +1101,7 @@ ngi541_run_ctr_canary_case (
   if (memcmp (
         key.data,
         key_material,
-        sizeof (key_material)) != 0 ||
+        key_len) != 0 ||
       memcmp (
         iv.data,
         iv_material,
@@ -1127,7 +1145,7 @@ ngi541_run_ctr_canary_case (
       NGI541_CIPHER_AES_CTR,
 
     .key = key.data,
-    .key_len = sizeof (key_material),
+    .key_len = key_len,
 
     .iv = iv.data,
     .iv_len = sizeof (iv_material),
@@ -1194,7 +1212,7 @@ ngi541_run_ctr_canary_case (
   if (memcmp (
         key.data,
         key_material,
-        sizeof (key_material)) != 0 ||
+        key_len) != 0 ||
       memcmp (
         iv.data,
         iv_material,
@@ -2910,6 +2928,25 @@ main (void)
     1, 2, 3, 7, 15,
   };
 
+    static const size_t ctr_variant_key_lengths[] =
+    {
+    24,
+    32,
+    };
+
+    static const size_t ctr_variant_lengths[] =
+    {
+    0,
+    1,
+    15,
+    16,
+    17,
+    63,
+    64,
+    65,
+    129,
+    };
+
   static const size_t cbc_key_lengths[] =
   {
     16,
@@ -2941,6 +2978,9 @@ main (void)
   size_t cbc_exact_size_cases = 0;
   size_t cbc_unaligned_cases = 0;
   size_t cbc_canary_cases = 0;
+  size_t ctr_variant_exact_cases = 0;
+  size_t ctr_variant_unaligned_cases = 0;
+  size_t ctr_variant_canary_cases = 0;
 
 
   status =
@@ -2969,6 +3009,7 @@ main (void)
     {
       if (ngi541_run_ctr_geometry_case (
             "exact-size",
+            16,
             lengths[i],
             0,
             0,
@@ -3009,6 +3050,7 @@ main (void)
 
           if (ngi541_run_ctr_geometry_case (
                 "unaligned-key",
+                16,
                 length,
                 offset,
                 0,
@@ -3021,6 +3063,7 @@ main (void)
 
           if (ngi541_run_ctr_geometry_case (
                 "unaligned-iv",
+                16,
                 length,
                 0,
                 offset,
@@ -3033,6 +3076,7 @@ main (void)
 
           if (ngi541_run_ctr_geometry_case (
                 "unaligned-input",
+                16,
                 length,
                 0,
                 0,
@@ -3045,6 +3089,7 @@ main (void)
 
           if (ngi541_run_ctr_geometry_case (
                 "unaligned-output",
+                16,
                 length,
                 0,
                 0,
@@ -3070,6 +3115,7 @@ main (void)
     {
       if (ngi541_run_ctr_canary_case (
             "canary-aligned",
+            16,
             lengths[i],
             0,
             0,
@@ -3106,6 +3152,7 @@ main (void)
 
           if (ngi541_run_ctr_canary_case (
                 "canary-unaligned-key",
+                16,
                 length,
                 offset,
                 0,
@@ -3118,6 +3165,7 @@ main (void)
 
           if (ngi541_run_ctr_canary_case (
                 "canary-unaligned-iv",
+                16,
                 length,
                 0,
                 offset,
@@ -3130,6 +3178,7 @@ main (void)
 
           if (ngi541_run_ctr_canary_case (
                 "canary-unaligned-input",
+                16,
                 length,
                 0,
                 0,
@@ -3142,6 +3191,7 @@ main (void)
 
           if (ngi541_run_ctr_canary_case (
                 "canary-unaligned-output",
+                16,
                 length,
                 0,
                 0,
@@ -3276,6 +3326,238 @@ main (void)
 
       adjacent_cases++;
     }
+
+    /*
+    * M5.2.4e.2 — AES-CTR-192/256 variant closure.
+    *
+    * AES-128 already has full deep geometry coverage.
+    * Here we exercise the remaining key-schedule variants.
+    */
+    for (
+    size_t key_index = 0;
+    key_index <
+        sizeof (ctr_variant_key_lengths) /
+        sizeof (ctr_variant_key_lengths[0]);
+    key_index++)
+    {
+        size_t key_len =
+        ctr_variant_key_lengths[key_index];
+
+        for (
+        size_t length_index = 0;
+        length_index <
+            sizeof (ctr_variant_lengths) /
+            sizeof (ctr_variant_lengths[0]);
+        length_index++)
+        {
+            size_t length =
+            ctr_variant_lengths[length_index];
+
+            if (ngi541_run_ctr_geometry_case (
+                "variant-exact",
+                key_len,
+                length,
+                0,
+                0,
+                0,
+                0) != 0)
+            return 1;
+
+            ctr_variant_exact_cases++;
+        }
+    }
+
+    for (
+    size_t key_index = 0;
+    key_index <
+        sizeof (ctr_variant_key_lengths) /
+        sizeof (ctr_variant_key_lengths[0]);
+    key_index++)
+    {
+        size_t key_len =
+        ctr_variant_key_lengths[key_index];
+
+        for (
+        size_t offset_index = 0;
+        offset_index <
+            sizeof (offsets) /
+            sizeof (offsets[0]);
+        offset_index++)
+        {
+            size_t offset =
+            offsets[offset_index];
+
+            for (
+            size_t length_index = 0;
+            length_index <
+                sizeof (ctr_variant_lengths) /
+                sizeof (ctr_variant_lengths[0]);
+            length_index++)
+            {
+                size_t length =
+                ctr_variant_lengths[length_index];
+
+                /*
+                * Key alignment remains meaningful even for
+                * a zero-length payload because key expansion executes.
+                */
+                if (ngi541_run_ctr_geometry_case (
+                    "variant-unaligned-key",
+                    key_len,
+                    length,
+                    offset,
+                    0,
+                    0,
+                    0) != 0)
+                return 1;
+
+                ctr_variant_unaligned_cases++;
+
+
+                /*
+                * Input/output alignment has no meaning for the
+                * NULL zero-length exact-size representation.
+                */
+                if (length != 0)
+                {
+                    if (ngi541_run_ctr_geometry_case (
+                        "variant-unaligned-input",
+                        key_len,
+                        length,
+                        0,
+                        0,
+                        offset,
+                        0) != 0)
+                    return 1;
+
+                    ctr_variant_unaligned_cases++;
+
+
+                    if (ngi541_run_ctr_geometry_case (
+                        "variant-unaligned-output",
+                        key_len,
+                        length,
+                        0,
+                        0,
+                        0,
+                        offset) != 0)
+                    return 1;
+
+                    ctr_variant_unaligned_cases++;
+                }
+            }
+        }
+    }
+
+    for (
+    size_t key_index = 0;
+    key_index <
+        sizeof (ctr_variant_key_lengths) /
+        sizeof (ctr_variant_key_lengths[0]);
+    key_index++)
+    {
+        size_t key_len =
+        ctr_variant_key_lengths[key_index];
+
+        for (
+        size_t length_index = 0;
+        length_index <
+            sizeof (ctr_variant_lengths) /
+            sizeof (ctr_variant_lengths[0]);
+        length_index++)
+        {
+            size_t length =
+            ctr_variant_lengths[length_index];
+
+            if (ngi541_run_ctr_canary_case (
+                "variant-canary",
+                key_len,
+                length,
+                0,
+                0,
+                0,
+                0) != 0)
+            return 1;
+
+            ctr_variant_canary_cases++;
+        }
+    }
+
+
+    for (
+    size_t key_index = 0;
+    key_index <
+        sizeof (ctr_variant_key_lengths) /
+        sizeof (ctr_variant_key_lengths[0]);
+    key_index++)
+    {
+        size_t key_len =
+        ctr_variant_key_lengths[key_index];
+
+        for (
+        size_t offset_index = 0;
+        offset_index <
+            sizeof (offsets) /
+            sizeof (offsets[0]);
+        offset_index++)
+        {
+            size_t offset =
+            offsets[offset_index];
+
+            for (
+            size_t length_index = 0;
+            length_index <
+                sizeof (ctr_variant_lengths) /
+                sizeof (ctr_variant_lengths[0]);
+            length_index++)
+            {
+                size_t length =
+                ctr_variant_lengths[length_index];
+
+                if (ngi541_run_ctr_canary_case (
+                    "variant-canary-key",
+                    key_len,
+                    length,
+                    offset,
+                    0,
+                    0,
+                    0) != 0)
+                return 1;
+
+                ctr_variant_canary_cases++;
+
+
+                if (length != 0)
+                {
+                    if (ngi541_run_ctr_canary_case (
+                        "variant-canary-input",
+                        key_len,
+                        length,
+                        0,
+                        0,
+                        offset,
+                        0) != 0)
+                    return 1;
+
+                    ctr_variant_canary_cases++;
+
+
+                    if (ngi541_run_ctr_canary_case (
+                        "variant-canary-output",
+                        key_len,
+                        length,
+                        0,
+                        0,
+                        0,
+                        offset) != 0)
+                    return 1;
+
+                    ctr_variant_canary_cases++;
+                }
+            }
+        }
+    }
+
 
   /*
    * M5.2.4e.1 — AES-CBC 128/192/256.
@@ -3545,6 +3827,20 @@ main (void)
       in_place_cases +
       partial_overlap_cases +
       adjacent_cases);
+
+    printf (
+    "AES-CTR variant geometry passed: "
+    "key_sizes=192/256 "
+    "exact_size=%zu "
+    "unaligned=%zu "
+    "canary=%zu "
+    "total=%zu\n",
+    ctr_variant_exact_cases,
+    ctr_variant_unaligned_cases,
+    ctr_variant_canary_cases,
+    ctr_variant_exact_cases +
+        ctr_variant_unaligned_cases +
+        ctr_variant_canary_cases);
 
   printf (
     "AES-CBC buffer geometry passed: "
