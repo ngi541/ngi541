@@ -1180,6 +1180,483 @@ out:
 }
 
 static int
+ngi541_run_ctr_in_place_case (
+  size_t length)
+{
+  static const uint8_t key[16] =
+  {
+    0x00, 0x01, 0x02, 0x03,
+    0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f,
+  };
+
+  static const uint8_t iv[16] =
+  {
+    0xf0, 0xf1, 0xf2, 0xf3,
+    0xf4, 0xf5, 0xf6, 0xf7,
+    0xf8, 0xf9, 0xfa, 0xfb,
+    0xfc, 0xfd, 0xfe, 0xff,
+  };
+
+  uint8_t source[NGI541_CTR_MAX_TEST_LENGTH];
+  uint8_t reference[NGI541_CTR_MAX_TEST_LENGTH];
+
+  ngi541_guarded_buffer_t buffer = { 0 };
+
+  ngi541_cipher_request_t request;
+  ngi541_status_t status;
+
+  int result = 1;
+
+
+  if (length > sizeof (source))
+    return 1;
+
+
+  ngi541_fill_test_data (
+    source,
+    sizeof (source));
+
+  memset (
+    reference,
+    0,
+    sizeof (reference));
+
+
+  /*
+   * Produce the normal out-of-place reference result.
+   */
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key,
+    .key_len = sizeof (key),
+
+    .iv = iv,
+    .iv_len = sizeof (iv),
+
+    .input =
+      length != 0
+        ? source
+        : NULL,
+
+    .input_len = length,
+
+    .output =
+      length != 0
+        ? reference
+        : NULL,
+
+    .output_capacity = length,
+  };
+
+  status =
+    ngi541_crypto_cipher_encrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR in-place baseline failed: "
+        "length=%zu status=%d\n",
+        length,
+        (int) status);
+
+      goto out;
+    }
+
+
+  /*
+   * Guarded buffer allows us to verify that exact in-place
+   * execution modifies only the declared logical region.
+   */
+  if (ngi541_guarded_buffer_allocate (
+        &buffer,
+        length,
+        0) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR in-place allocation failed: "
+        "length=%zu\n",
+        length);
+
+      goto out;
+    }
+
+
+  if (length != 0)
+    memcpy (
+      buffer.data,
+      source,
+      length);
+
+
+  /*
+   * Exact alias:
+   *
+   *     input == output
+   */
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key,
+    .key_len = sizeof (key),
+
+    .iv = iv,
+    .iv_len = sizeof (iv),
+
+    .input = buffer.data,
+    .input_len = length,
+
+    .output = buffer.data,
+    .output_capacity = length,
+  };
+
+  status =
+    ngi541_crypto_cipher_encrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR in-place encrypt failed: "
+        "length=%zu status=%d\n",
+        length,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (length != 0 &&
+      memcmp (
+        buffer.data,
+        reference,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR in-place ciphertext mismatch: "
+        "length=%zu\n",
+        length);
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_verify (
+        &buffer,
+        "in-place",
+        "exact-alias-encrypt",
+        length) != 0)
+    goto out;
+
+
+  /*
+   * CTR decrypt is the same transformation.
+   * Decrypt the ciphertext in the same physical buffer.
+   */
+  status =
+    ngi541_crypto_cipher_decrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR in-place decrypt failed: "
+        "length=%zu status=%d\n",
+        length,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (length != 0 &&
+      memcmp (
+        buffer.data,
+        source,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR in-place plaintext mismatch: "
+        "length=%zu\n",
+        length);
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_verify (
+        &buffer,
+        "in-place",
+        "exact-alias-decrypt",
+        length) != 0)
+    goto out;
+
+
+  result = 0;
+
+
+out:
+  ngi541_guarded_buffer_free (
+    &buffer);
+
+  return result;
+}
+
+static int
+ngi541_run_ctr_partial_overlap_case (
+  size_t length,
+  size_t shift,
+  int output_after_input)
+{
+  static const uint8_t key[16] =
+  {
+    0x00, 0x01, 0x02, 0x03,
+    0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f,
+  };
+
+  static const uint8_t iv[16] =
+  {
+    0xf0, 0xf1, 0xf2, 0xf3,
+    0xf4, 0xf5, 0xf6, 0xf7,
+    0xf8, 0xf9, 0xfa, 0xfb,
+    0xfc, 0xfd, 0xfe, 0xff,
+  };
+
+  uint8_t before[
+    NGI541_CTR_MAX_TEST_LENGTH * 2];
+
+  ngi541_guarded_buffer_t arena = { 0 };
+
+  const uint8_t *input;
+  uint8_t *output;
+
+  ngi541_cipher_request_t request;
+  ngi541_status_t status;
+
+  size_t span;
+
+  int result = 1;
+
+
+  if (length <= 1 ||
+      shift == 0 ||
+      shift >= length)
+    return 1;
+
+
+  span =
+    length + shift;
+
+  if (span > sizeof (before))
+    return 1;
+
+
+  if (ngi541_guarded_buffer_allocate (
+        &arena,
+        span,
+        0) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR overlap allocation failed: "
+        "length=%zu shift=%zu\n",
+        length,
+        shift);
+
+      goto out;
+    }
+
+
+  ngi541_fill_test_data (
+    arena.data,
+    span);
+
+  memcpy (
+    before,
+    arena.data,
+    span);
+
+
+  if (output_after_input)
+    {
+      input =
+        arena.data;
+
+      output =
+        arena.data + shift;
+    }
+  else
+    {
+      input =
+        arena.data + shift;
+
+      output =
+        arena.data;
+    }
+
+
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key,
+    .key_len = sizeof (key),
+
+    .iv = iv,
+    .iv_len = sizeof (iv),
+
+    .input = input,
+    .input_len = length,
+
+    .output = output,
+    .output_capacity = length,
+  };
+
+
+  status =
+    ngi541_crypto_cipher_encrypt (
+      &request);
+
+  if (status !=
+      NGI541_STATUS_INVALID_ARGUMENT)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR partial-overlap encrypt "
+        "was not rejected: "
+        "length=%zu shift=%zu direction=%s "
+        "status=%d\n",
+        length,
+        shift,
+        output_after_input
+          ? "forward"
+          : "backward",
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        arena.data,
+        before,
+        span) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR rejected encrypt modified "
+        "overlap arena: "
+        "length=%zu shift=%zu direction=%s\n",
+        length,
+        shift,
+        output_after_input
+          ? "forward"
+          : "backward");
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_verify (
+        &arena,
+        "partial-overlap",
+        output_after_input
+          ? "forward-encrypt"
+          : "backward-encrypt",
+        span) != 0)
+    goto out;
+
+
+  status =
+    ngi541_crypto_cipher_decrypt (
+      &request);
+
+  if (status !=
+      NGI541_STATUS_INVALID_ARGUMENT)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR partial-overlap decrypt "
+        "was not rejected: "
+        "length=%zu shift=%zu direction=%s "
+        "status=%d\n",
+        length,
+        shift,
+        output_after_input
+          ? "forward"
+          : "backward",
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        arena.data,
+        before,
+        span) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR rejected decrypt modified "
+        "overlap arena: "
+        "length=%zu shift=%zu direction=%s\n",
+        length,
+        shift,
+        output_after_input
+          ? "forward"
+          : "backward");
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_verify (
+        &arena,
+        "partial-overlap",
+        output_after_input
+          ? "forward-decrypt"
+          : "backward-decrypt",
+        span) != 0)
+    goto out;
+
+
+  result = 0;
+
+
+out:
+  ngi541_guarded_buffer_free (
+    &arena);
+
+  return result;
+}
+
+static int
 ngi541_run_ctr_zero_length_null_case (void)
 {
   uint8_t key[16] =
@@ -1291,6 +1768,322 @@ ngi541_run_ctr_zero_length_null_case (void)
   return 0;
 }
 
+static int
+ngi541_run_ctr_adjacent_case (
+  size_t length,
+  int output_after_input)
+{
+  static const uint8_t key[16] =
+  {
+    0x00, 0x01, 0x02, 0x03,
+    0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f,
+  };
+
+  static const uint8_t iv[16] =
+  {
+    0xf0, 0xf1, 0xf2, 0xf3,
+    0xf4, 0xf5, 0xf6, 0xf7,
+    0xf8, 0xf9, 0xfa, 0xfb,
+    0xfc, 0xfd, 0xfe, 0xff,
+  };
+
+  uint8_t source[
+    NGI541_CTR_MAX_TEST_LENGTH];
+
+  uint8_t reference[
+    NGI541_CTR_MAX_TEST_LENGTH];
+
+  ngi541_guarded_buffer_t arena = { 0 };
+
+  uint8_t *input;
+  uint8_t *output;
+
+  ngi541_cipher_request_t request;
+  ngi541_status_t status;
+
+  int result = 1;
+
+
+  if (length == 0 ||
+      length > sizeof (source))
+    return 1;
+
+
+  ngi541_fill_test_data (
+    source,
+    sizeof (source));
+
+  memset (
+    reference,
+    0,
+    sizeof (reference));
+
+
+  /*
+   * Produce ordinary reference ciphertext.
+   */
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key,
+    .key_len = sizeof (key),
+
+    .iv = iv,
+    .iv_len = sizeof (iv),
+
+    .input = source,
+    .input_len = length,
+
+    .output = reference,
+    .output_capacity = length,
+  };
+
+  status =
+    ngi541_crypto_cipher_encrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR adjacent baseline failed: "
+        "length=%zu status=%d\n",
+        length,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_allocate (
+        &arena,
+        length * 2,
+        0) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR adjacent allocation failed: "
+        "length=%zu\n",
+        length);
+
+      goto out;
+    }
+
+
+  if (output_after_input)
+    {
+      input =
+        arena.data;
+
+      output =
+        arena.data + length;
+    }
+  else
+    {
+      output =
+        arena.data;
+
+      input =
+        arena.data + length;
+    }
+
+
+  memcpy (
+    input,
+    source,
+    length);
+
+  memset (
+    output,
+    0x5a,
+    length);
+
+
+  request = (ngi541_cipher_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_cipher_request_t),
+
+    .algorithm =
+      NGI541_CIPHER_AES_CTR,
+
+    .key = key,
+    .key_len = sizeof (key),
+
+    .iv = iv,
+    .iv_len = sizeof (iv),
+
+    .input = input,
+    .input_len = length,
+
+    .output = output,
+    .output_capacity = length,
+  };
+
+
+  status =
+    ngi541_crypto_cipher_encrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR adjacent encrypt rejected: "
+        "length=%zu direction=%s status=%d\n",
+        length,
+        output_after_input
+          ? "forward"
+          : "backward",
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        output,
+        reference,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR adjacent ciphertext mismatch: "
+        "length=%zu direction=%s\n",
+        length,
+        output_after_input
+          ? "forward"
+          : "backward");
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        input,
+        source,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR adjacent encrypt modified input: "
+        "length=%zu direction=%s\n",
+        length,
+        output_after_input
+          ? "forward"
+          : "backward");
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_verify (
+        &arena,
+        "adjacent",
+        output_after_input
+          ? "forward-encrypt"
+          : "backward-encrypt",
+        length * 2) != 0)
+    goto out;
+
+
+  /*
+   * Verify decrypt with the same adjacency ordering.
+   */
+  memcpy (
+    input,
+    reference,
+    length);
+
+  memset (
+    output,
+    0x5a,
+    length);
+
+
+  status =
+    ngi541_crypto_cipher_decrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR adjacent decrypt rejected: "
+        "length=%zu direction=%s status=%d\n",
+        length,
+        output_after_input
+          ? "forward"
+          : "backward",
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        output,
+        source,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR adjacent plaintext mismatch: "
+        "length=%zu direction=%s\n",
+        length,
+        output_after_input
+          ? "forward"
+          : "backward");
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        input,
+        reference,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR adjacent decrypt modified input: "
+        "length=%zu direction=%s\n",
+        length,
+        output_after_input
+          ? "forward"
+          : "backward");
+
+      goto out;
+    }
+
+
+  if (ngi541_guarded_buffer_verify (
+        &arena,
+        "adjacent",
+        output_after_input
+          ? "forward-decrypt"
+          : "backward-decrypt",
+        length * 2) != 0)
+    goto out;
+
+
+  result = 0;
+
+
+out:
+  ngi541_guarded_buffer_free (
+    &arena);
+
+  return result;
+}
+
 int
 main (void)
 {
@@ -1316,6 +2109,9 @@ main (void)
   size_t unaligned_cases = 0;
   size_t canary_cases = 0;
   size_t zero_null_cases = 0;
+  size_t in_place_cases = 0;
+  size_t partial_overlap_cases = 0;
+  size_t adjacent_cases = 0;
 
 
   status =
@@ -1534,21 +2330,148 @@ main (void)
 
   zero_null_cases++;
 
+
+  /*
+   * M5.2.4d.1:
+   * Audit exact in-place AES-CTR semantics before making
+   * aliasing behavior part of the public API contract.
+   */
+  for (
+    size_t i = 0;
+    i < sizeof (lengths) / sizeof (lengths[0]);
+    i++)
+    {
+      if (ngi541_run_ctr_in_place_case (
+            lengths[i]) != 0)
+        return 1;
+
+      in_place_cases++;
+    }
+
+  /*
+   * M5.2.4d.2-d.3:
+   *
+   * Partial overlap is explicitly rejected. Exercise both address
+   * orderings and both minimal and near-complete overlap.
+   */
+  for (
+    size_t length_index = 1;
+    length_index <
+      sizeof (lengths) / sizeof (lengths[0]);
+    length_index++)
+    {
+      size_t length =
+        lengths[length_index];
+
+      size_t shifts[2];
+      size_t shift_count;
+
+
+      if (length <= 1)
+        continue;
+
+
+      shifts[0] = 1;
+
+      if (length > 2)
+        {
+          shifts[1] =
+            length - 1;
+
+          shift_count = 2;
+        }
+      else
+        {
+          shift_count = 1;
+        }
+
+
+      for (
+        size_t shift_index = 0;
+        shift_index < shift_count;
+        shift_index++)
+        {
+          size_t shift =
+            shifts[shift_index];
+
+
+          if (ngi541_run_ctr_partial_overlap_case (
+                length,
+                shift,
+                1) != 0)
+            return 1;
+
+          partial_overlap_cases++;
+
+
+          if (ngi541_run_ctr_partial_overlap_case (
+                length,
+                shift,
+                0) != 0)
+            return 1;
+
+          partial_overlap_cases++;
+        }
+    }
+
+
+  /*
+   * Boundary-adjacent regions are disjoint and must remain valid.
+   *
+   * This is the exact boundary condition for the overlap predicate:
+   *
+   *     distance == length
+   */
+  for (
+    size_t length_index = 1;
+    length_index <
+      sizeof (lengths) / sizeof (lengths[0]);
+    length_index++)
+    {
+      size_t length =
+        lengths[length_index];
+
+
+      if (ngi541_run_ctr_adjacent_case (
+            length,
+            1) != 0)
+        return 1;
+
+      adjacent_cases++;
+
+
+      if (ngi541_run_ctr_adjacent_case (
+            length,
+            0) != 0)
+        return 1;
+
+      adjacent_cases++;
+    }
+
   printf (
     "AES-CTR buffer geometry passed: "
     "exact_size=%zu "
     "unaligned=%zu "
     "canary=%zu "
     "zero_null=%zu "
+    "in_place=%zu "
+    "partial_overlap_rejected=%zu "
+    "adjacent=%zu "
     "total=%zu\n",
     exact_size_cases,
     unaligned_cases,
     canary_cases,
     zero_null_cases,
+    in_place_cases,
+    partial_overlap_cases,
+    adjacent_cases,
     exact_size_cases +
       unaligned_cases +
       canary_cases +
-      zero_null_cases);
+      zero_null_cases +
+      in_place_cases +
+      partial_overlap_cases +
+      adjacent_cases);
 
   return 0;
 }
