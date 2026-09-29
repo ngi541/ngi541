@@ -644,19 +644,6 @@ jobs:
             --build build-asan \
             --parallel
 
-      - name: Run UBSan buffer geometry regression gate
-        shell: bash
-        env:
-          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
-        run: |
-          set -euo pipefail
-
-          ctest \
-            --test-dir build-ubsan \
-            -R '^robustness\.buffer_geometry$' \
-            --output-on-failure \
-            --no-tests=error
-
       - name: Run ASan+LSan buffer geometry regression gate
         shell: bash
         env:
@@ -764,6 +751,19 @@ jobs:
           cmake \
             --build build-ubsan \
             --parallel
+
+      - name: Run UBSan buffer geometry regression gate
+        shell: bash
+        env:
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-ubsan \
+            -R '^robustness\.buffer_geometry$' \
+            --output-on-failure \
+            --no-tests=error
 
       - name: Run full UBSan test suite
         shell: bash
