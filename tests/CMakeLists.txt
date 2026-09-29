@@ -33,6 +33,8 @@ add_test(
 if(NGI541_BUILD_ENGINE)
     add_subdirectory(engine)
 
+    add_subdirectory(robustness)
+
     add_executable(
         ngi541_public_api_compile_test
         public/api_compile.c
