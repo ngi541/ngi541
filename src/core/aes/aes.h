@@ -191,7 +191,15 @@ aes192_key_expand (u8x16 * rk, u8x16u const *k)
   u8x16 r1, r2;
 
   rk[0] = r1 = k[0];
-  rk[1] = r2 = (u8x16) (u64x2) { *(u64 *) (k + 1), 0 };
+  /*
+  * AES-192 stores the final 64 key bits in the second
+  * 16-byte chunk. The public key buffer may be unaligned.
+  */
+  rk[1] = r2 =
+    (u8x16) (u64x2) {
+      *(const u64u *) (k + 1),
+      0
+    };
 
   aes192_key_assist (&r1, &r2, aes_keygen_assist (r2, 0x1));
   rk[1] = (u8x16) _mm_shuffle_pd ((__m128d) rk[1], (__m128d) r1, 0);
