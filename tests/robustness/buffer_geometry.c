@@ -14,6 +14,10 @@
 
 #define NGI541_CTR_MAX_TEST_LENGTH 129
 #define NGI541_CBC_MAX_TEST_LENGTH 256
+#define NGI541_GCM_MAX_PAYLOAD_LENGTH 129
+#define NGI541_GCM_MAX_AAD_LENGTH     33
+#define NGI541_GCM_IV_LENGTH          12
+#define NGI541_GCM_TAG_LENGTH         16
 #define NGI541_TEST_GUARD_SIZE 32
 #define NGI541_TEST_CANARY     0xa5
 
@@ -37,6 +41,11 @@ typedef struct
   size_t suffix_size;
 } ngi541_guarded_buffer_t;
 
+typedef struct
+{
+  size_t plaintext_len;
+  size_t aad_len;
+} ngi541_gcm_geometry_case_t;
 
 static int
 ngi541_test_buffer_allocate_suffix_exact (
@@ -179,7 +188,7 @@ ngi541_guarded_buffer_verify (
         {
           fprintf (
             stderr,
-            "AES-CTR prefix canary modified: "
+            "buffer prefix canary modified: "
             "geometry=%s buffer=%s "
             "length=%zu offset=%zu "
             "actual=0x%02x\n",
@@ -207,7 +216,7 @@ ngi541_guarded_buffer_verify (
         {
           fprintf (
             stderr,
-            "AES-CTR suffix canary modified: "
+            "buffer suffix canary modified: "
             "geometry=%s buffer=%s "
             "length=%zu offset=%zu "
             "actual=0x%02x\n",
@@ -305,6 +314,86 @@ ngi541_make_cbc_reference (
         "key_len=%zu length=%zu status=%d\n",
         key_len,
         input_len,
+        (int) status);
+
+      return 1;
+    }
+
+
+  return 0;
+}
+
+static int
+ngi541_make_gcm_reference (
+  const uint8_t *key,
+  size_t key_len,
+  const uint8_t *iv,
+  const uint8_t *aad,
+  size_t aad_len,
+  const uint8_t *plaintext,
+  size_t plaintext_len,
+  uint8_t *ciphertext,
+  uint8_t *tag)
+{
+  ngi541_aead_encrypt_request_t request;
+  ngi541_status_t status;
+
+
+  request = (ngi541_aead_encrypt_request_t)
+  {
+    .struct_size =
+      sizeof (ngi541_aead_encrypt_request_t),
+
+    .algorithm =
+      NGI541_AEAD_AES_GCM,
+
+    .key = key,
+    .key_len = key_len,
+
+    .iv = iv,
+    .iv_len = NGI541_GCM_IV_LENGTH,
+
+    .aad =
+      aad_len != 0
+        ? aad
+        : NULL,
+
+    .aad_len = aad_len,
+
+    .plaintext =
+      plaintext_len != 0
+        ? plaintext
+        : NULL,
+
+    .plaintext_len = plaintext_len,
+
+    .ciphertext =
+      plaintext_len != 0
+        ? ciphertext
+        : NULL,
+
+    .ciphertext_capacity =
+      plaintext_len,
+
+    .tag = tag,
+    .tag_len = NGI541_GCM_TAG_LENGTH,
+  };
+
+
+  status =
+    ngi541_crypto_aead_encrypt (
+      &request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM baseline encrypt failed: "
+        "key_len=%zu plaintext_len=%zu "
+        "aad_len=%zu status=%d\n",
+        key_len,
+        plaintext_len,
+        aad_len,
         (int) status);
 
       return 1;
@@ -2908,6 +2997,1525 @@ out:
   return result;
 }
 
+static int
+ngi541_run_gcm_exact_case (
+  const char *geometry,
+  size_t key_len,
+  size_t plaintext_len,
+  size_t aad_len,
+  size_t key_offset,
+  size_t iv_offset,
+  size_t aad_offset,
+  size_t plaintext_offset,
+  size_t ciphertext_offset,
+  size_t tag_offset)
+{
+  static const uint8_t key_material[32] =
+  {
+    0x00, 0x01, 0x02, 0x03,
+    0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f,
+    0x10, 0x11, 0x12, 0x13,
+    0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1a, 0x1b,
+    0x1c, 0x1d, 0x1e, 0x1f,
+  };
+
+  static const uint8_t iv_material[
+    NGI541_GCM_IV_LENGTH] =
+  {
+    0xa0, 0xa1, 0xa2, 0xa3,
+    0xa4, 0xa5, 0xa6, 0xa7,
+    0xa8, 0xa9, 0xaa, 0xab,
+  };
+
+  uint8_t plaintext_source[
+    NGI541_GCM_MAX_PAYLOAD_LENGTH];
+
+  uint8_t aad_source[
+    NGI541_GCM_MAX_AAD_LENGTH];
+
+  uint8_t reference_ciphertext[
+    NGI541_GCM_MAX_PAYLOAD_LENGTH];
+
+  uint8_t reference_tag[
+    NGI541_GCM_TAG_LENGTH];
+
+
+  ngi541_test_buffer_t key = { 0 };
+  ngi541_test_buffer_t iv = { 0 };
+  ngi541_test_buffer_t aad = { 0 };
+
+  ngi541_test_buffer_t encrypt_plaintext = { 0 };
+  ngi541_test_buffer_t encrypt_ciphertext = { 0 };
+  ngi541_test_buffer_t encrypt_tag = { 0 };
+
+  ngi541_test_buffer_t decrypt_ciphertext = { 0 };
+  ngi541_test_buffer_t decrypt_plaintext = { 0 };
+  ngi541_test_buffer_t decrypt_tag = { 0 };
+
+  ngi541_aead_encrypt_request_t encrypt_request;
+  ngi541_aead_decrypt_request_t decrypt_request;
+
+  ngi541_status_t status;
+
+  int result = 1;
+
+
+  if (geometry == NULL ||
+      (key_len != 16 &&
+       key_len != 24 &&
+       key_len != 32) ||
+      plaintext_len >
+        NGI541_GCM_MAX_PAYLOAD_LENGTH ||
+      aad_len >
+        NGI541_GCM_MAX_AAD_LENGTH)
+    return 1;
+
+
+  if (aad_len == 0 &&
+      aad_offset != 0)
+    return 1;
+
+
+  if (plaintext_len == 0 &&
+      (plaintext_offset != 0 ||
+       ciphertext_offset != 0))
+    return 1;
+
+
+  ngi541_fill_test_data (
+    plaintext_source,
+    sizeof (plaintext_source));
+
+  ngi541_fill_test_data (
+    aad_source,
+    sizeof (aad_source));
+
+  memset (
+    reference_ciphertext,
+    0,
+    sizeof (reference_ciphertext));
+
+  memset (
+    reference_tag,
+    0,
+    sizeof (reference_tag));
+
+
+  if (ngi541_make_gcm_reference (
+        key_material,
+        key_len,
+        iv_material,
+        aad_source,
+        aad_len,
+        plaintext_source,
+        plaintext_len,
+        reference_ciphertext,
+        reference_tag) != 0)
+    goto out;
+
+
+  /*
+   * Exact-size allocations deliberately place the logical end
+   * directly against the allocator boundary.
+   */
+  if (ngi541_test_buffer_allocate_suffix_exact (
+        &key,
+        key_len,
+        key_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &iv,
+        NGI541_GCM_IV_LENGTH,
+        iv_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &aad,
+        aad_len,
+        aad_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &encrypt_plaintext,
+        plaintext_len,
+        plaintext_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &encrypt_ciphertext,
+        plaintext_len,
+        ciphertext_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &encrypt_tag,
+        NGI541_GCM_TAG_LENGTH,
+        tag_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &decrypt_ciphertext,
+        plaintext_len,
+        ciphertext_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &decrypt_plaintext,
+        plaintext_len,
+        plaintext_offset) != 0 ||
+      ngi541_test_buffer_allocate_suffix_exact (
+        &decrypt_tag,
+        NGI541_GCM_TAG_LENGTH,
+        tag_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM exact allocation failed: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  memcpy (
+    key.data,
+    key_material,
+    key_len);
+
+  memcpy (
+    iv.data,
+    iv_material,
+    NGI541_GCM_IV_LENGTH);
+
+  if (aad_len != 0)
+    memcpy (
+      aad.data,
+      aad_source,
+      aad_len);
+
+  if (plaintext_len != 0)
+    {
+      memcpy (
+        encrypt_plaintext.data,
+        plaintext_source,
+        plaintext_len);
+
+      memset (
+        encrypt_ciphertext.data,
+        0x5a,
+        plaintext_len);
+
+      memcpy (
+        decrypt_ciphertext.data,
+        reference_ciphertext,
+        plaintext_len);
+
+      memset (
+        decrypt_plaintext.data,
+        0x5a,
+        plaintext_len);
+    }
+
+  memset (
+    encrypt_tag.data,
+    0x5a,
+    NGI541_GCM_TAG_LENGTH);
+
+  memcpy (
+    decrypt_tag.data,
+    reference_tag,
+    NGI541_GCM_TAG_LENGTH);
+
+
+  encrypt_request =
+    (ngi541_aead_encrypt_request_t)
+    {
+      .struct_size =
+        sizeof (ngi541_aead_encrypt_request_t),
+
+      .algorithm =
+        NGI541_AEAD_AES_GCM,
+
+      .key = key.data,
+      .key_len = key_len,
+
+      .iv = iv.data,
+      .iv_len = NGI541_GCM_IV_LENGTH,
+
+      .aad = aad.data,
+      .aad_len = aad_len,
+
+      .plaintext =
+        encrypt_plaintext.data,
+
+      .plaintext_len =
+        plaintext_len,
+
+      .ciphertext =
+        encrypt_ciphertext.data,
+
+      .ciphertext_capacity =
+        plaintext_len,
+
+      .tag = encrypt_tag.data,
+      .tag_len = NGI541_GCM_TAG_LENGTH,
+    };
+
+
+  status =
+    ngi541_crypto_aead_encrypt (
+      &encrypt_request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM geometry encrypt failed: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu "
+        "status=%d\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        encrypt_plaintext.data,
+        plaintext_source,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM encrypt modified plaintext: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        encrypt_ciphertext.data,
+        reference_ciphertext,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM ciphertext mismatch: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        encrypt_tag.data,
+        reference_tag,
+        NGI541_GCM_TAG_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM tag mismatch: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        key.data,
+        key_material,
+        key_len) != 0 ||
+      memcmp (
+        iv.data,
+        iv_material,
+        NGI541_GCM_IV_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM encrypt modified key or IV: "
+        "geometry=%s key_len=%zu\n",
+        geometry,
+        key_len);
+
+      goto out;
+    }
+
+
+  if (aad_len != 0 &&
+      memcmp (
+        aad.data,
+        aad_source,
+        aad_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM encrypt modified AAD: "
+        "geometry=%s aad_len=%zu\n",
+        geometry,
+        aad_len);
+
+      goto out;
+    }
+
+
+  decrypt_request =
+    (ngi541_aead_decrypt_request_t)
+    {
+      .struct_size =
+        sizeof (ngi541_aead_decrypt_request_t),
+
+      .algorithm =
+        NGI541_AEAD_AES_GCM,
+
+      .key = key.data,
+      .key_len = key_len,
+
+      .iv = iv.data,
+      .iv_len = NGI541_GCM_IV_LENGTH,
+
+      .aad = aad.data,
+      .aad_len = aad_len,
+
+      .ciphertext =
+        decrypt_ciphertext.data,
+
+      .ciphertext_len =
+        plaintext_len,
+
+      .tag = decrypt_tag.data,
+      .tag_len = NGI541_GCM_TAG_LENGTH,
+
+      .plaintext =
+        decrypt_plaintext.data,
+
+      .plaintext_capacity =
+        plaintext_len,
+    };
+
+
+  status =
+    ngi541_crypto_aead_decrypt (
+      &decrypt_request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM geometry decrypt failed: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu "
+        "status=%d\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        decrypt_plaintext.data,
+        plaintext_source,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM plaintext mismatch: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        decrypt_ciphertext.data,
+        reference_ciphertext,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM decrypt modified ciphertext: "
+        "geometry=%s key_len=%zu\n",
+        geometry,
+        key_len);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        decrypt_tag.data,
+        reference_tag,
+        NGI541_GCM_TAG_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM decrypt modified tag: "
+        "geometry=%s key_len=%zu\n",
+        geometry,
+        key_len);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        key.data,
+        key_material,
+        key_len) != 0 ||
+      memcmp (
+        iv.data,
+        iv_material,
+        NGI541_GCM_IV_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM decrypt modified key or IV: "
+        "geometry=%s key_len=%zu\n",
+        geometry,
+        key_len);
+
+      goto out;
+    }
+
+
+  if (aad_len != 0 &&
+      memcmp (
+        aad.data,
+        aad_source,
+        aad_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM decrypt modified AAD: "
+        "geometry=%s aad_len=%zu\n",
+        geometry,
+        aad_len);
+
+      goto out;
+    }
+
+
+  result = 0;
+
+
+out:
+  ngi541_test_buffer_free (
+    &decrypt_tag);
+
+  ngi541_test_buffer_free (
+    &decrypt_plaintext);
+
+  ngi541_test_buffer_free (
+    &decrypt_ciphertext);
+
+  ngi541_test_buffer_free (
+    &encrypt_tag);
+
+  ngi541_test_buffer_free (
+    &encrypt_ciphertext);
+
+  ngi541_test_buffer_free (
+    &encrypt_plaintext);
+
+  ngi541_test_buffer_free (
+    &aad);
+
+  ngi541_test_buffer_free (
+    &iv);
+
+  ngi541_test_buffer_free (
+    &key);
+
+  return result;
+}
+
+
+static int
+ngi541_run_gcm_canary_case (
+  const char *geometry,
+  size_t key_len,
+  size_t plaintext_len,
+  size_t aad_len,
+  size_t key_offset,
+  size_t iv_offset,
+  size_t aad_offset,
+  size_t plaintext_offset,
+  size_t ciphertext_offset,
+  size_t tag_offset)
+{
+  static const uint8_t key_material[32] =
+  {
+    0x00, 0x01, 0x02, 0x03,
+    0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f,
+    0x10, 0x11, 0x12, 0x13,
+    0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1a, 0x1b,
+    0x1c, 0x1d, 0x1e, 0x1f,
+  };
+
+  static const uint8_t iv_material[
+    NGI541_GCM_IV_LENGTH] =
+  {
+    0xa0, 0xa1, 0xa2, 0xa3,
+    0xa4, 0xa5, 0xa6, 0xa7,
+    0xa8, 0xa9, 0xaa, 0xab,
+  };
+
+  uint8_t plaintext_source[
+    NGI541_GCM_MAX_PAYLOAD_LENGTH];
+
+  uint8_t aad_source[
+    NGI541_GCM_MAX_AAD_LENGTH];
+
+  uint8_t reference_ciphertext[
+    NGI541_GCM_MAX_PAYLOAD_LENGTH];
+
+  uint8_t reference_tag[
+    NGI541_GCM_TAG_LENGTH];
+
+
+  ngi541_guarded_buffer_t key = { 0 };
+  ngi541_guarded_buffer_t iv = { 0 };
+  ngi541_guarded_buffer_t aad = { 0 };
+
+  ngi541_guarded_buffer_t encrypt_plaintext = { 0 };
+  ngi541_guarded_buffer_t encrypt_ciphertext = { 0 };
+  ngi541_guarded_buffer_t encrypt_tag = { 0 };
+
+  ngi541_guarded_buffer_t decrypt_ciphertext = { 0 };
+  ngi541_guarded_buffer_t decrypt_plaintext = { 0 };
+  ngi541_guarded_buffer_t decrypt_tag = { 0 };
+
+  ngi541_aead_encrypt_request_t encrypt_request;
+  ngi541_aead_decrypt_request_t decrypt_request;
+
+  ngi541_status_t status;
+
+  int result = 1;
+
+
+  if (geometry == NULL ||
+      (key_len != 16 &&
+       key_len != 24 &&
+       key_len != 32) ||
+      plaintext_len >
+        NGI541_GCM_MAX_PAYLOAD_LENGTH ||
+      aad_len >
+        NGI541_GCM_MAX_AAD_LENGTH)
+    return 1;
+
+
+  ngi541_fill_test_data (
+    plaintext_source,
+    sizeof (plaintext_source));
+
+  ngi541_fill_test_data (
+    aad_source,
+    sizeof (aad_source));
+
+  memset (
+    reference_ciphertext,
+    0,
+    sizeof (reference_ciphertext));
+
+  memset (
+    reference_tag,
+    0,
+    sizeof (reference_tag));
+
+
+  if (ngi541_make_gcm_reference (
+        key_material,
+        key_len,
+        iv_material,
+        aad_source,
+        aad_len,
+        plaintext_source,
+        plaintext_len,
+        reference_ciphertext,
+        reference_tag) != 0)
+    goto out;
+
+
+  /*
+   * Guarded allocation deliberately returns a non-NULL logical
+   * pointer even for a zero-sized logical buffer.
+   */
+  if (ngi541_guarded_buffer_allocate (
+        &key,
+        key_len,
+        key_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &iv,
+        NGI541_GCM_IV_LENGTH,
+        iv_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &aad,
+        aad_len,
+        aad_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &encrypt_plaintext,
+        plaintext_len,
+        plaintext_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &encrypt_ciphertext,
+        plaintext_len,
+        ciphertext_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &encrypt_tag,
+        NGI541_GCM_TAG_LENGTH,
+        tag_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &decrypt_ciphertext,
+        plaintext_len,
+        ciphertext_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &decrypt_plaintext,
+        plaintext_len,
+        plaintext_offset) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &decrypt_tag,
+        NGI541_GCM_TAG_LENGTH,
+        tag_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded allocation failed: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  memcpy (
+    key.data,
+    key_material,
+    key_len);
+
+  memcpy (
+    iv.data,
+    iv_material,
+    NGI541_GCM_IV_LENGTH);
+
+  if (aad_len != 0)
+    memcpy (
+      aad.data,
+      aad_source,
+      aad_len);
+
+  if (plaintext_len != 0)
+    {
+      memcpy (
+        encrypt_plaintext.data,
+        plaintext_source,
+        plaintext_len);
+
+      memset (
+        encrypt_ciphertext.data,
+        0x5a,
+        plaintext_len);
+
+      memcpy (
+        decrypt_ciphertext.data,
+        reference_ciphertext,
+        plaintext_len);
+
+      memset (
+        decrypt_plaintext.data,
+        0x5a,
+        plaintext_len);
+    }
+
+  memset (
+    encrypt_tag.data,
+    0x5a,
+    NGI541_GCM_TAG_LENGTH);
+
+  memcpy (
+    decrypt_tag.data,
+    reference_tag,
+    NGI541_GCM_TAG_LENGTH);
+
+
+  encrypt_request =
+    (ngi541_aead_encrypt_request_t)
+    {
+      .struct_size =
+        sizeof (ngi541_aead_encrypt_request_t),
+
+      .algorithm =
+        NGI541_AEAD_AES_GCM,
+
+      .key = key.data,
+      .key_len = key_len,
+
+      .iv = iv.data,
+      .iv_len = NGI541_GCM_IV_LENGTH,
+
+      .aad = aad.data,
+      .aad_len = aad_len,
+
+      .plaintext =
+        encrypt_plaintext.data,
+      .plaintext_len =
+        plaintext_len,
+
+      .ciphertext =
+        encrypt_ciphertext.data,
+      .ciphertext_capacity =
+        plaintext_len,
+
+      .tag = encrypt_tag.data,
+      .tag_len =
+        NGI541_GCM_TAG_LENGTH,
+    };
+
+
+  status =
+    ngi541_crypto_aead_encrypt (
+      &encrypt_request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded encrypt failed: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu "
+        "status=%d\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        encrypt_plaintext.data,
+        plaintext_source,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded encrypt "
+        "modified plaintext input: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        encrypt_ciphertext.data,
+        reference_ciphertext,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded ciphertext mismatch: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        encrypt_tag.data,
+        reference_tag,
+        NGI541_GCM_TAG_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded tag mismatch: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        key.data,
+        key_material,
+        key_len) != 0 ||
+      memcmp (
+        iv.data,
+        iv_material,
+        NGI541_GCM_IV_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded encrypt "
+        "modified key or IV\n");
+
+      goto out;
+    }
+
+
+  if (aad_len != 0 &&
+      memcmp (
+        aad.data,
+        aad_source,
+        aad_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded encrypt "
+        "modified AAD\n");
+
+      goto out;
+    }
+
+
+#define VERIFY_GCM_GUARD(buffer_)                               \
+  do                                                            \
+    {                                                           \
+      if (ngi541_guarded_buffer_verify (                         \
+            &(buffer_),                                         \
+            #buffer_,                                           \
+            geometry,                                           \
+            plaintext_len) != 0)                                \
+        goto out;                                               \
+    }                                                           \
+  while (0)
+
+
+  VERIFY_GCM_GUARD (key);
+  VERIFY_GCM_GUARD (iv);
+  VERIFY_GCM_GUARD (aad);
+  VERIFY_GCM_GUARD (encrypt_plaintext);
+  VERIFY_GCM_GUARD (encrypt_ciphertext);
+  VERIFY_GCM_GUARD (encrypt_tag);
+
+
+  decrypt_request =
+    (ngi541_aead_decrypt_request_t)
+    {
+      .struct_size =
+        sizeof (ngi541_aead_decrypt_request_t),
+
+      .algorithm =
+        NGI541_AEAD_AES_GCM,
+
+      .key = key.data,
+      .key_len = key_len,
+
+      .iv = iv.data,
+      .iv_len = NGI541_GCM_IV_LENGTH,
+
+      .aad = aad.data,
+      .aad_len = aad_len,
+
+      .ciphertext =
+        decrypt_ciphertext.data,
+      .ciphertext_len =
+        plaintext_len,
+
+      .tag =
+        decrypt_tag.data,
+      .tag_len =
+        NGI541_GCM_TAG_LENGTH,
+
+      .plaintext =
+        decrypt_plaintext.data,
+      .plaintext_capacity =
+        plaintext_len,
+    };
+
+
+  status =
+    ngi541_crypto_aead_decrypt (
+      &decrypt_request);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded decrypt failed: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu "
+        "status=%d\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len,
+        (int) status);
+
+      goto out;
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        decrypt_plaintext.data,
+        plaintext_source,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded plaintext mismatch: "
+        "geometry=%s key_len=%zu "
+        "plaintext_len=%zu aad_len=%zu\n",
+        geometry,
+        key_len,
+        plaintext_len,
+        aad_len);
+
+      goto out;
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        decrypt_ciphertext.data,
+        reference_ciphertext,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded decrypt "
+        "modified ciphertext\n");
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        decrypt_tag.data,
+        reference_tag,
+        NGI541_GCM_TAG_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded decrypt "
+        "modified tag\n");
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        key.data,
+        key_material,
+        key_len) != 0 ||
+      memcmp (
+        iv.data,
+        iv_material,
+        NGI541_GCM_IV_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded decrypt "
+        "modified key or IV\n");
+
+      goto out;
+    }
+
+
+  if (aad_len != 0 &&
+      memcmp (
+        aad.data,
+        aad_source,
+        aad_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM guarded decrypt "
+        "modified AAD\n");
+
+      goto out;
+    }
+
+
+  VERIFY_GCM_GUARD (key);
+  VERIFY_GCM_GUARD (iv);
+  VERIFY_GCM_GUARD (aad);
+  VERIFY_GCM_GUARD (decrypt_ciphertext);
+  VERIFY_GCM_GUARD (decrypt_plaintext);
+  VERIFY_GCM_GUARD (decrypt_tag);
+
+
+#undef VERIFY_GCM_GUARD
+
+
+  result = 0;
+
+
+out:
+  ngi541_guarded_buffer_free (
+    &decrypt_tag);
+
+  ngi541_guarded_buffer_free (
+    &decrypt_plaintext);
+
+  ngi541_guarded_buffer_free (
+    &decrypt_ciphertext);
+
+  ngi541_guarded_buffer_free (
+    &encrypt_tag);
+
+  ngi541_guarded_buffer_free (
+    &encrypt_ciphertext);
+
+  ngi541_guarded_buffer_free (
+    &encrypt_plaintext);
+
+  ngi541_guarded_buffer_free (
+    &aad);
+
+  ngi541_guarded_buffer_free (
+    &iv);
+
+  ngi541_guarded_buffer_free (
+    &key);
+
+  return result;
+}
+
+static int
+ngi541_run_gcm_auth_failure_case (
+  size_t key_len,
+  size_t plaintext_len,
+  size_t aad_len,
+  size_t plaintext_offset)
+{
+  static const uint8_t key_material[32] =
+  {
+    0x00, 0x01, 0x02, 0x03,
+    0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f,
+    0x10, 0x11, 0x12, 0x13,
+    0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1a, 0x1b,
+    0x1c, 0x1d, 0x1e, 0x1f,
+  };
+
+  static const uint8_t iv_material[
+    NGI541_GCM_IV_LENGTH] =
+  {
+    0xa0, 0xa1, 0xa2, 0xa3,
+    0xa4, 0xa5, 0xa6, 0xa7,
+    0xa8, 0xa9, 0xaa, 0xab,
+  };
+
+  uint8_t plaintext_source[
+    NGI541_GCM_MAX_PAYLOAD_LENGTH];
+
+  uint8_t aad_source[
+    NGI541_GCM_MAX_AAD_LENGTH];
+
+  uint8_t reference_ciphertext[
+    NGI541_GCM_MAX_PAYLOAD_LENGTH];
+
+  uint8_t reference_tag[
+    NGI541_GCM_TAG_LENGTH];
+
+
+  ngi541_guarded_buffer_t key = { 0 };
+  ngi541_guarded_buffer_t iv = { 0 };
+  ngi541_guarded_buffer_t aad = { 0 };
+  ngi541_guarded_buffer_t ciphertext = { 0 };
+  ngi541_guarded_buffer_t bad_tag = { 0 };
+  ngi541_guarded_buffer_t plaintext = { 0 };
+
+  ngi541_aead_decrypt_request_t request;
+  ngi541_status_t status;
+
+  int result = 1;
+
+
+  if ((key_len != 16 &&
+       key_len != 24 &&
+       key_len != 32) ||
+      plaintext_len >
+        NGI541_GCM_MAX_PAYLOAD_LENGTH ||
+      aad_len >
+        NGI541_GCM_MAX_AAD_LENGTH)
+    return 1;
+
+
+  if (plaintext_len == 0 &&
+      plaintext_offset != 0)
+    return 1;
+
+
+  ngi541_fill_test_data (
+    plaintext_source,
+    sizeof (plaintext_source));
+
+  ngi541_fill_test_data (
+    aad_source,
+    sizeof (aad_source));
+
+  memset (
+    reference_ciphertext,
+    0,
+    sizeof (reference_ciphertext));
+
+  memset (
+    reference_tag,
+    0,
+    sizeof (reference_tag));
+
+
+  if (ngi541_make_gcm_reference (
+        key_material,
+        key_len,
+        iv_material,
+        aad_source,
+        aad_len,
+        plaintext_source,
+        plaintext_len,
+        reference_ciphertext,
+        reference_tag) != 0)
+    goto out;
+
+
+  if (ngi541_guarded_buffer_allocate (
+        &key,
+        key_len,
+        0) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &iv,
+        NGI541_GCM_IV_LENGTH,
+        0) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &aad,
+        aad_len,
+        0) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &ciphertext,
+        plaintext_len,
+        0) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &bad_tag,
+        NGI541_GCM_TAG_LENGTH,
+        0) != 0 ||
+      ngi541_guarded_buffer_allocate (
+        &plaintext,
+        plaintext_len,
+        plaintext_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM auth-failure "
+        "guard allocation failed: "
+        "key_len=%zu plaintext_len=%zu "
+        "aad_len=%zu offset=%zu\n",
+        key_len,
+        plaintext_len,
+        aad_len,
+        plaintext_offset);
+
+      goto out;
+    }
+
+
+  memcpy (
+    key.data,
+    key_material,
+    key_len);
+
+  memcpy (
+    iv.data,
+    iv_material,
+    NGI541_GCM_IV_LENGTH);
+
+  if (aad_len != 0)
+    memcpy (
+      aad.data,
+      aad_source,
+      aad_len);
+
+  if (plaintext_len != 0)
+    {
+      memcpy (
+        ciphertext.data,
+        reference_ciphertext,
+        plaintext_len);
+
+      /*
+       * Must be observably non-zero before decrypt so that
+       * zeroization is actually verified.
+       */
+      memset (
+        plaintext.data,
+        0x5a,
+        plaintext_len);
+    }
+
+
+  memcpy (
+    bad_tag.data,
+    reference_tag,
+    NGI541_GCM_TAG_LENGTH);
+
+  /*
+   * Corrupt exactly one authentication bit.
+   */
+  bad_tag.data[0] ^= 0x80;
+
+
+  request =
+    (ngi541_aead_decrypt_request_t)
+    {
+      .struct_size =
+        sizeof (ngi541_aead_decrypt_request_t),
+
+      .algorithm =
+        NGI541_AEAD_AES_GCM,
+
+      .key = key.data,
+      .key_len = key_len,
+
+      .iv = iv.data,
+      .iv_len = NGI541_GCM_IV_LENGTH,
+
+      .aad = aad.data,
+      .aad_len = aad_len,
+
+      .ciphertext = ciphertext.data,
+      .ciphertext_len = plaintext_len,
+
+      .tag = bad_tag.data,
+      .tag_len = NGI541_GCM_TAG_LENGTH,
+
+      .plaintext = plaintext.data,
+      .plaintext_capacity = plaintext_len,
+    };
+
+
+  status =
+    ngi541_crypto_aead_decrypt (
+      &request);
+
+  if (status != NGI541_STATUS_AUTH_FAILED)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM invalid tag was not rejected: "
+        "key_len=%zu plaintext_len=%zu "
+        "aad_len=%zu offset=%zu status=%d\n",
+        key_len,
+        plaintext_len,
+        aad_len,
+        plaintext_offset,
+        (int) status);
+
+      goto out;
+    }
+
+
+  /*
+   * For a non-empty ciphertext, the public facade guarantees that
+   * unauthenticated plaintext is scrubbed before returning.
+   */
+  if (plaintext_len != 0)
+    {
+      for (
+        size_t i = 0;
+        i < plaintext_len;
+        i++)
+        {
+          if (plaintext.data[i] != 0)
+            {
+              fprintf (
+                stderr,
+                "AES-GCM auth-failure plaintext "
+                "was not fully zeroized: "
+                "key_len=%zu plaintext_len=%zu "
+                "aad_len=%zu offset=%zu index=%zu "
+                "actual=0x%02x\n",
+                key_len,
+                plaintext_len,
+                aad_len,
+                plaintext_offset,
+                i,
+                plaintext.data[i]);
+
+              goto out;
+            }
+        }
+    }
+
+
+  if (plaintext_len != 0 &&
+      memcmp (
+        ciphertext.data,
+        reference_ciphertext,
+        plaintext_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM auth-failure modified "
+        "ciphertext input\n");
+
+      goto out;
+    }
+
+
+  /*
+   * Decrypt receives the tag as const public input.
+   * Compare against the deliberately corrupted value.
+   */
+  {
+    uint8_t expected_bad_tag[
+      NGI541_GCM_TAG_LENGTH];
+
+    memcpy (
+      expected_bad_tag,
+      reference_tag,
+      NGI541_GCM_TAG_LENGTH);
+
+    expected_bad_tag[0] ^= 0x80;
+
+    if (memcmp (
+          bad_tag.data,
+          expected_bad_tag,
+          NGI541_GCM_TAG_LENGTH) != 0)
+      {
+        fprintf (
+          stderr,
+          "AES-GCM auth-failure modified tag input\n");
+
+        goto out;
+      }
+  }
+
+
+  if (memcmp (
+        key.data,
+        key_material,
+        key_len) != 0 ||
+      memcmp (
+        iv.data,
+        iv_material,
+        NGI541_GCM_IV_LENGTH) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM auth-failure modified key or IV\n");
+
+      goto out;
+    }
+
+
+  if (aad_len != 0 &&
+      memcmp (
+        aad.data,
+        aad_source,
+        aad_len) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-GCM auth-failure modified AAD\n");
+
+      goto out;
+    }
+
+
+#define VERIFY_AUTH_GUARD(buffer_)                              \
+  do                                                            \
+    {                                                           \
+      if (ngi541_guarded_buffer_verify (                         \
+            &(buffer_),                                         \
+            #buffer_,                                           \
+            "gcm-auth-failure",                                 \
+            plaintext_len) != 0)                                \
+        goto out;                                               \
+    }                                                           \
+  while (0)
+
+
+  VERIFY_AUTH_GUARD (key);
+  VERIFY_AUTH_GUARD (iv);
+  VERIFY_AUTH_GUARD (aad);
+  VERIFY_AUTH_GUARD (ciphertext);
+  VERIFY_AUTH_GUARD (bad_tag);
+  VERIFY_AUTH_GUARD (plaintext);
+
+
+#undef VERIFY_AUTH_GUARD
+
+
+  result = 0;
+
+
+out:
+  ngi541_guarded_buffer_free (
+    &plaintext);
+
+  ngi541_guarded_buffer_free (
+    &bad_tag);
+
+  ngi541_guarded_buffer_free (
+    &ciphertext);
+
+  ngi541_guarded_buffer_free (
+    &aad);
+
+  ngi541_guarded_buffer_free (
+    &iv);
+
+  ngi541_guarded_buffer_free (
+    &key);
+
+  return result;
+}
 
 int
 main (void)
@@ -2966,6 +4574,87 @@ main (void)
     256,
   };
 
+  static const size_t gcm_key_lengths[] =
+  {
+    16,
+    24,
+    32,
+  };
+
+    static const ngi541_gcm_geometry_case_t
+    gcm_cases[] =
+    {
+    /*
+    * Payload boundary sweep through specialized AAD12 path.
+    */
+    {   0, 12 },
+    {   1, 12 },
+    {   2, 12 },
+    {   3, 12 },
+    {   7, 12 },
+    {   8, 12 },
+    {   9, 12 },
+    {  15, 12 },
+    {  16, 12 },
+    {  17, 12 },
+    {  31, 12 },
+    {  32, 12 },
+    {  33, 12 },
+    {  63, 12 },
+    {  64, 12 },
+    {  65, 12 },
+    { 127, 12 },
+    { 128, 12 },
+    { 129, 12 },
+
+    /*
+    * AAD boundary sweep.
+    *
+    * AAD8 exercises the second specialized path.
+    * All other non-12 values exercise the generic operation.
+    */
+    { 17,  0 },
+    { 17,  1 },
+    { 17,  7 },
+    { 17,  8 },
+    { 17,  9 },
+    { 17, 11 },
+    { 17, 13 },
+    { 17, 15 },
+    { 17, 16 },
+    { 17, 17 },
+    { 17, 31 },
+    { 17, 32 },
+    { 17, 33 },
+
+    /*
+    * Explicit zero-payload coverage for generic and AAD8.
+    * Zero-payload AAD12 is already present above.
+    */
+    { 0, 0 },
+    { 0, 8 },
+    };
+
+  static const ngi541_gcm_geometry_case_t
+  gcm_auth_failure_cases[] =
+    {
+    /*
+    * Empty-payload authentication only.
+    */
+    {   0,  0 },
+    {   0,  8 },
+    {   0, 12 },
+
+    /*
+    * Generic and specialized paths around block boundaries.
+    */
+    {   1,  0 },
+    {  15,  8 },
+    {  16, 12 },
+    {  17, 13 },
+    { 129, 33 },
+    };
+
   ngi541_status_t status;
 
   size_t exact_size_cases = 0;
@@ -2981,6 +4670,10 @@ main (void)
   size_t ctr_variant_exact_cases = 0;
   size_t ctr_variant_unaligned_cases = 0;
   size_t ctr_variant_canary_cases = 0;
+  size_t gcm_exact_size_cases = 0;
+  size_t gcm_unaligned_cases = 0;
+  size_t gcm_canary_cases = 0;
+  size_t gcm_auth_failure_cases_run = 0;
 
 
   status =
@@ -3803,6 +5496,469 @@ main (void)
         }
     }
 
+/*
+ * M5.2.4e.3a — AES-GCM 128/192/256.
+ *
+ * Exact-size aligned geometry.
+ */
+for (
+  size_t key_index = 0;
+  key_index <
+    sizeof (gcm_key_lengths) /
+      sizeof (gcm_key_lengths[0]);
+  key_index++)
+  {
+    size_t key_len =
+      gcm_key_lengths[key_index];
+
+    for (
+      size_t case_index = 0;
+      case_index <
+        sizeof (gcm_cases) /
+          sizeof (gcm_cases[0]);
+      case_index++)
+      {
+        size_t plaintext_len =
+          gcm_cases[case_index].plaintext_len;
+
+        size_t aad_len =
+          gcm_cases[case_index].aad_len;
+
+
+        if (ngi541_run_gcm_exact_case (
+              "gcm-exact",
+              key_len,
+              plaintext_len,
+              aad_len,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0) != 0)
+          return 1;
+
+        gcm_exact_size_cases++;
+      }
+  }
+
+  /*
+ * Deliberately misalign one public AEAD buffer at a time.
+ */
+for (
+  size_t key_index = 0;
+  key_index <
+    sizeof (gcm_key_lengths) /
+      sizeof (gcm_key_lengths[0]);
+  key_index++)
+  {
+    size_t key_len =
+      gcm_key_lengths[key_index];
+
+    for (
+      size_t offset_index = 0;
+      offset_index <
+        sizeof (offsets) /
+          sizeof (offsets[0]);
+      offset_index++)
+      {
+        size_t offset =
+          offsets[offset_index];
+
+        for (
+          size_t case_index = 0;
+          case_index <
+            sizeof (gcm_cases) /
+              sizeof (gcm_cases[0]);
+          case_index++)
+          {
+            size_t plaintext_len =
+              gcm_cases[case_index].plaintext_len;
+
+            size_t aad_len =
+              gcm_cases[case_index].aad_len;
+
+
+            if (ngi541_run_gcm_exact_case (
+                  "gcm-unaligned-key",
+                  key_len,
+                  plaintext_len,
+                  aad_len,
+                  offset,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0) != 0)
+              return 1;
+
+            gcm_unaligned_cases++;
+
+
+            if (ngi541_run_gcm_exact_case (
+                  "gcm-unaligned-iv",
+                  key_len,
+                  plaintext_len,
+                  aad_len,
+                  0,
+                  offset,
+                  0,
+                  0,
+                  0,
+                  0) != 0)
+              return 1;
+
+            gcm_unaligned_cases++;
+
+
+            if (ngi541_run_gcm_exact_case (
+                  "gcm-unaligned-tag",
+                  key_len,
+                  plaintext_len,
+                  aad_len,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  offset) != 0)
+              return 1;
+
+            gcm_unaligned_cases++;
+
+
+            if (aad_len != 0)
+              {
+                if (ngi541_run_gcm_exact_case (
+                      "gcm-unaligned-aad",
+                      key_len,
+                      plaintext_len,
+                      aad_len,
+                      0,
+                      0,
+                      offset,
+                      0,
+                      0,
+                      0) != 0)
+                  return 1;
+
+                gcm_unaligned_cases++;
+              }
+
+
+            if (plaintext_len != 0)
+              {
+                if (ngi541_run_gcm_exact_case (
+                      "gcm-unaligned-plaintext",
+                      key_len,
+                      plaintext_len,
+                      aad_len,
+                      0,
+                      0,
+                      0,
+                      offset,
+                      0,
+                      0) != 0)
+                  return 1;
+
+                gcm_unaligned_cases++;
+
+
+                if (ngi541_run_gcm_exact_case (
+                      "gcm-unaligned-ciphertext",
+                      key_len,
+                      plaintext_len,
+                      aad_len,
+                      0,
+                      0,
+                      0,
+                      0,
+                      offset,
+                      0) != 0)
+                  return 1;
+
+                gcm_unaligned_cases++;
+              }
+          }
+      }
+  }
+
+/*
+ * M5.2.4e.3b:
+ * Full guarded success-path corpus.
+ */
+for (
+  size_t key_index = 0;
+  key_index <
+    sizeof (gcm_key_lengths) /
+      sizeof (gcm_key_lengths[0]);
+  key_index++)
+  {
+    size_t key_len =
+      gcm_key_lengths[key_index];
+
+    for (
+      size_t case_index = 0;
+      case_index <
+        sizeof (gcm_cases) /
+          sizeof (gcm_cases[0]);
+      case_index++)
+      {
+        size_t plaintext_len =
+          gcm_cases[case_index].plaintext_len;
+
+        size_t aad_len =
+          gcm_cases[case_index].aad_len;
+
+
+        if (ngi541_run_gcm_canary_case (
+              "gcm-canary",
+              key_len,
+              plaintext_len,
+              aad_len,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0) != 0)
+          return 1;
+
+        gcm_canary_cases++;
+      }
+  }
+
+/*
+ * Combine logical guards with each deliberately
+ * unaligned public GCM buffer independently.
+ */
+for (
+  size_t key_index = 0;
+  key_index <
+    sizeof (gcm_key_lengths) /
+      sizeof (gcm_key_lengths[0]);
+  key_index++)
+  {
+    size_t key_len =
+      gcm_key_lengths[key_index];
+
+    for (
+      size_t offset_index = 0;
+      offset_index <
+        sizeof (offsets) /
+          sizeof (offsets[0]);
+      offset_index++)
+      {
+        size_t offset =
+          offsets[offset_index];
+
+        for (
+          size_t case_index = 0;
+          case_index <
+            sizeof (gcm_cases) /
+              sizeof (gcm_cases[0]);
+          case_index++)
+          {
+            size_t plaintext_len =
+              gcm_cases[case_index].plaintext_len;
+
+            size_t aad_len =
+              gcm_cases[case_index].aad_len;
+
+
+            if (ngi541_run_gcm_canary_case (
+                  "gcm-canary-key",
+                  key_len,
+                  plaintext_len,
+                  aad_len,
+                  offset,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0) != 0)
+              return 1;
+
+            gcm_canary_cases++;
+
+
+            if (ngi541_run_gcm_canary_case (
+                  "gcm-canary-iv",
+                  key_len,
+                  plaintext_len,
+                  aad_len,
+                  0,
+                  offset,
+                  0,
+                  0,
+                  0,
+                  0) != 0)
+              return 1;
+
+            gcm_canary_cases++;
+
+
+            if (ngi541_run_gcm_canary_case (
+                  "gcm-canary-tag",
+                  key_len,
+                  plaintext_len,
+                  aad_len,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  offset) != 0)
+              return 1;
+
+            gcm_canary_cases++;
+
+
+            if (aad_len != 0)
+              {
+                if (ngi541_run_gcm_canary_case (
+                      "gcm-canary-aad",
+                      key_len,
+                      plaintext_len,
+                      aad_len,
+                      0,
+                      0,
+                      offset,
+                      0,
+                      0,
+                      0) != 0)
+                  return 1;
+
+                gcm_canary_cases++;
+              }
+
+
+            if (plaintext_len != 0)
+              {
+                if (ngi541_run_gcm_canary_case (
+                      "gcm-canary-plaintext",
+                      key_len,
+                      plaintext_len,
+                      aad_len,
+                      0,
+                      0,
+                      0,
+                      offset,
+                      0,
+                      0) != 0)
+                  return 1;
+
+                gcm_canary_cases++;
+
+
+                if (ngi541_run_gcm_canary_case (
+                      "gcm-canary-ciphertext",
+                      key_len,
+                      plaintext_len,
+                      aad_len,
+                      0,
+                      0,
+                      0,
+                      0,
+                      offset,
+                      0) != 0)
+                  return 1;
+
+                gcm_canary_cases++;
+              }
+          }
+      }
+  }
+
+for (
+  size_t key_index = 0;
+  key_index <
+    sizeof (gcm_key_lengths) /
+      sizeof (gcm_key_lengths[0]);
+  key_index++)
+  {
+    size_t key_len =
+      gcm_key_lengths[key_index];
+
+    for (
+      size_t case_index = 0;
+      case_index <
+        sizeof (gcm_auth_failure_cases) /
+          sizeof (gcm_auth_failure_cases[0]);
+      case_index++)
+      {
+        size_t plaintext_len =
+          gcm_auth_failure_cases[
+            case_index].plaintext_len;
+
+        size_t aad_len =
+          gcm_auth_failure_cases[
+            case_index].aad_len;
+
+
+        if (ngi541_run_gcm_auth_failure_case (
+              key_len,
+              plaintext_len,
+              aad_len,
+              0) != 0)
+          return 1;
+
+        gcm_auth_failure_cases_run++;
+      }
+  }
+
+for (
+  size_t key_index = 0;
+  key_index <
+    sizeof (gcm_key_lengths) /
+      sizeof (gcm_key_lengths[0]);
+  key_index++)
+  {
+    size_t key_len =
+      gcm_key_lengths[key_index];
+
+    for (
+      size_t offset_index = 0;
+      offset_index <
+        sizeof (offsets) /
+          sizeof (offsets[0]);
+      offset_index++)
+      {
+        size_t offset =
+          offsets[offset_index];
+
+        for (
+          size_t case_index = 0;
+          case_index <
+            sizeof (gcm_auth_failure_cases) /
+              sizeof (gcm_auth_failure_cases[0]);
+          case_index++)
+          {
+            size_t plaintext_len =
+              gcm_auth_failure_cases[
+                case_index].plaintext_len;
+
+            size_t aad_len =
+              gcm_auth_failure_cases[
+                case_index].aad_len;
+
+
+            if (plaintext_len == 0)
+              continue;
+
+
+            if (ngi541_run_gcm_auth_failure_case (
+                  key_len,
+                  plaintext_len,
+                  aad_len,
+                  offset) != 0)
+              return 1;
+
+            gcm_auth_failure_cases_run++;
+          }
+      }
+  }  
+
   printf (
     "AES-CTR buffer geometry passed: "
     "exact_size=%zu "
@@ -3854,6 +6010,23 @@ main (void)
     cbc_exact_size_cases +
       cbc_unaligned_cases +
       cbc_canary_cases);
+
+    printf (
+    "AES-GCM buffer geometry passed: "
+    "key_sizes=128/192/256 "
+    "exact_size=%zu "
+    "unaligned=%zu "
+    "canary=%zu "
+    "auth_failed=%zu "
+    "total=%zu\n",
+    gcm_exact_size_cases,
+    gcm_unaligned_cases,
+    gcm_canary_cases,
+    gcm_auth_failure_cases_run,
+    gcm_exact_size_cases +
+        gcm_unaligned_cases +
+        gcm_canary_cases +
+        gcm_auth_failure_cases_run);
 
   return 0;
 }
