@@ -99,10 +99,15 @@ ngi541_fill_test_data (
 
 
 static int
-ngi541_run_ctr_exact_size_case (
-  size_t length)
+ngi541_run_ctr_geometry_case (
+  const char *geometry,
+  size_t length,
+  size_t key_offset,
+  size_t iv_offset,
+  size_t input_offset,
+  size_t output_offset)
 {
-  static const uint8_t key[16] =
+  static const uint8_t key_material[16] =
   {
     0x00, 0x01, 0x02, 0x03,
     0x04, 0x05, 0x06, 0x07,
@@ -110,7 +115,7 @@ ngi541_run_ctr_exact_size_case (
     0x0c, 0x0d, 0x0e, 0x0f,
   };
 
-  static const uint8_t iv[16] =
+  static const uint8_t iv_material[16] =
   {
     0xf0, 0xf1, 0xf2, 0xf3,
     0xf4, 0xf5, 0xf6, 0xf7,
@@ -121,9 +126,14 @@ ngi541_run_ctr_exact_size_case (
   uint8_t source[NGI541_CTR_MAX_TEST_LENGTH];
   uint8_t reference[NGI541_CTR_MAX_TEST_LENGTH];
 
-  ngi541_test_buffer_t input = { 0 };
-  ngi541_test_buffer_t ciphertext = { 0 };
-  ngi541_test_buffer_t plaintext = { 0 };
+  ngi541_test_buffer_t key = { 0 };
+  ngi541_test_buffer_t iv = { 0 };
+
+  ngi541_test_buffer_t encrypt_input = { 0 };
+  ngi541_test_buffer_t encrypt_output = { 0 };
+
+  ngi541_test_buffer_t decrypt_input = { 0 };
+  ngi541_test_buffer_t decrypt_output = { 0 };
 
   ngi541_cipher_request_t request;
   ngi541_status_t status;
@@ -131,12 +141,32 @@ ngi541_run_ctr_exact_size_case (
   int result = 1;
 
 
-  if (length > sizeof (source))
+  if (geometry == NULL ||
+      length > sizeof (source))
     {
       fprintf (
         stderr,
-        "AES-CTR exact-size: invalid test length=%zu\n",
-        length);
+        "AES-CTR geometry: invalid test case\n");
+
+      return 1;
+    }
+
+  /*
+   * Alignment of a zero-length data buffer has no meaning.
+   *
+   * M5.2.4a already covers the NULL/zero-length path.
+   */
+  if (length == 0 &&
+      (input_offset != 0 ||
+       output_offset != 0))
+    {
+      fprintf (
+        stderr,
+        "AES-CTR geometry: invalid zero-length offsets: "
+        "geometry=%s input_offset=%zu output_offset=%zu\n",
+        geometry,
+        input_offset,
+        output_offset);
 
       return 1;
     }
@@ -153,10 +183,10 @@ ngi541_run_ctr_exact_size_case (
 
 
   /*
-   * First produce the functional baseline using ordinary storage.
+   * Produce a normal aligned reference result.
    *
-   * M5.1 already established cipher correctness. This baseline lets
-   * the geometry test isolate memory-layout dependent differences.
+   * Differential correctness is already covered by M5.1; this
+   * baseline isolates changes caused by buffer geometry.
    */
   request = (ngi541_cipher_request_t)
   {
@@ -166,11 +196,11 @@ ngi541_run_ctr_exact_size_case (
     .algorithm =
       NGI541_CIPHER_AES_CTR,
 
-    .key = key,
-    .key_len = sizeof (key),
+    .key = key_material,
+    .key_len = sizeof (key_material),
 
-    .iv = iv,
-    .iv_len = sizeof (iv),
+    .iv = iv_material,
+    .iv_len = sizeof (iv_material),
 
     .input =
       length != 0
@@ -196,7 +226,8 @@ ngi541_run_ctr_exact_size_case (
       fprintf (
         stderr,
         "AES-CTR baseline encrypt failed: "
-        "length=%zu status=%d\n",
+        "geometry=%s length=%zu status=%d\n",
+        geometry,
         length,
         (int) status);
 
@@ -205,72 +236,145 @@ ngi541_run_ctr_exact_size_case (
 
 
   /*
-   * The exact-size allocations intentionally contain no trailing
-   * spare capacity. Under ASan, the byte immediately following each
-   * allocation belongs to the allocator redzone.
+   * Allocate each public buffer independently.
+   *
+   * data = base + offset deliberately breaks natural alignment.
+   * The logical buffer still ends exactly at the allocation end,
+   * preserving the M5.2.4a suffix-boundary property.
    */
   if (ngi541_test_buffer_allocate_suffix_exact (
-        &input,
-        length,
-        0) != 0)
+        &key,
+        sizeof (key_material),
+        key_offset) != 0)
     {
       fprintf (
         stderr,
-        "AES-CTR input allocation failed: "
-        "length=%zu\n",
-        length);
+        "AES-CTR key allocation failed: "
+        "geometry=%s offset=%zu\n",
+        geometry,
+        key_offset);
 
       goto out;
     }
 
   if (ngi541_test_buffer_allocate_suffix_exact (
-        &ciphertext,
-        length,
-        0) != 0)
+        &iv,
+        sizeof (iv_material),
+        iv_offset) != 0)
     {
       fprintf (
         stderr,
-        "AES-CTR ciphertext allocation failed: "
-        "length=%zu\n",
-        length);
+        "AES-CTR IV allocation failed: "
+        "geometry=%s offset=%zu\n",
+        geometry,
+        iv_offset);
 
       goto out;
     }
 
   if (ngi541_test_buffer_allocate_suffix_exact (
-        &plaintext,
+        &encrypt_input,
         length,
-        0) != 0)
+        input_offset) != 0)
     {
       fprintf (
         stderr,
-        "AES-CTR plaintext allocation failed: "
-        "length=%zu\n",
-        length);
+        "AES-CTR encrypt input allocation failed: "
+        "geometry=%s length=%zu offset=%zu\n",
+        geometry,
+        length,
+        input_offset);
 
       goto out;
     }
+
+  if (ngi541_test_buffer_allocate_suffix_exact (
+        &encrypt_output,
+        length,
+        output_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR encrypt output allocation failed: "
+        "geometry=%s length=%zu offset=%zu\n",
+        geometry,
+        length,
+        output_offset);
+
+      goto out;
+    }
+
+  if (ngi541_test_buffer_allocate_suffix_exact (
+        &decrypt_input,
+        length,
+        input_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR decrypt input allocation failed: "
+        "geometry=%s length=%zu offset=%zu\n",
+        geometry,
+        length,
+        input_offset);
+
+      goto out;
+    }
+
+  if (ngi541_test_buffer_allocate_suffix_exact (
+        &decrypt_output,
+        length,
+        output_offset) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR decrypt output allocation failed: "
+        "geometry=%s length=%zu offset=%zu\n",
+        geometry,
+        length,
+        output_offset);
+
+      goto out;
+    }
+
+
+  memcpy (
+    key.data,
+    key_material,
+    sizeof (key_material));
+
+  memcpy (
+    iv.data,
+    iv_material,
+    sizeof (iv_material));
 
 
   if (length != 0)
     {
       memcpy (
-        input.data,
+        encrypt_input.data,
         source,
         length);
 
       memset (
-        ciphertext.data,
+        encrypt_output.data,
         0xa5,
         length);
 
+      memcpy (
+        decrypt_input.data,
+        reference,
+        length);
+
       memset (
-        plaintext.data,
+        decrypt_output.data,
         0x5a,
         length);
     }
 
 
+  /*
+   * Encrypt through the public API using the requested geometry.
+   */
   request = (ngi541_cipher_request_t)
   {
     .struct_size =
@@ -279,16 +383,16 @@ ngi541_run_ctr_exact_size_case (
     .algorithm =
       NGI541_CIPHER_AES_CTR,
 
-    .key = key,
-    .key_len = sizeof (key),
+    .key = key.data,
+    .key_len = sizeof (key_material),
 
-    .iv = iv,
-    .iv_len = sizeof (iv),
+    .iv = iv.data,
+    .iv_len = sizeof (iv_material),
 
-    .input = input.data,
+    .input = encrypt_input.data,
     .input_len = length,
 
-    .output = ciphertext.data,
+    .output = encrypt_output.data,
     .output_capacity = length,
   };
 
@@ -300,9 +404,16 @@ ngi541_run_ctr_exact_size_case (
     {
       fprintf (
         stderr,
-        "AES-CTR exact-size encrypt failed: "
-        "length=%zu status=%d\n",
+        "AES-CTR geometry encrypt failed: "
+        "geometry=%s length=%zu "
+        "key=%zu iv=%zu input=%zu output=%zu "
+        "status=%d\n",
+        geometry,
         length,
+        key_offset,
+        iv_offset,
+        input_offset,
+        output_offset,
         (int) status);
 
       goto out;
@@ -311,14 +422,15 @@ ngi541_run_ctr_exact_size_case (
 
   if (length != 0 &&
       memcmp (
-        input.data,
+        encrypt_input.data,
         source,
         length) != 0)
     {
       fprintf (
         stderr,
-        "AES-CTR encrypt modified input: "
-        "length=%zu\n",
+        "AES-CTR geometry encrypt modified input: "
+        "geometry=%s length=%zu\n",
+        geometry,
         length);
 
       goto out;
@@ -327,20 +439,32 @@ ngi541_run_ctr_exact_size_case (
 
   if (length != 0 &&
       memcmp (
-        ciphertext.data,
+        encrypt_output.data,
         reference,
         length) != 0)
     {
       fprintf (
         stderr,
-        "AES-CTR exact-size ciphertext mismatch: "
-        "length=%zu\n",
-        length);
+        "AES-CTR geometry ciphertext mismatch: "
+        "geometry=%s length=%zu "
+        "key=%zu iv=%zu input=%zu output=%zu\n",
+        geometry,
+        length,
+        key_offset,
+        iv_offset,
+        input_offset,
+        output_offset);
 
       goto out;
     }
 
 
+  /*
+   * Decrypt from an independently allocated input buffer.
+   *
+   * This is deliberate: input and output alignment must be tested
+   * independently in both operation directions.
+   */
   request = (ngi541_cipher_request_t)
   {
     .struct_size =
@@ -349,16 +473,16 @@ ngi541_run_ctr_exact_size_case (
     .algorithm =
       NGI541_CIPHER_AES_CTR,
 
-    .key = key,
-    .key_len = sizeof (key),
+    .key = key.data,
+    .key_len = sizeof (key_material),
 
-    .iv = iv,
-    .iv_len = sizeof (iv),
+    .iv = iv.data,
+    .iv_len = sizeof (iv_material),
 
-    .input = ciphertext.data,
+    .input = decrypt_input.data,
     .input_len = length,
 
-    .output = plaintext.data,
+    .output = decrypt_output.data,
     .output_capacity = length,
   };
 
@@ -370,9 +494,16 @@ ngi541_run_ctr_exact_size_case (
     {
       fprintf (
         stderr,
-        "AES-CTR exact-size decrypt failed: "
-        "length=%zu status=%d\n",
+        "AES-CTR geometry decrypt failed: "
+        "geometry=%s length=%zu "
+        "key=%zu iv=%zu input=%zu output=%zu "
+        "status=%d\n",
+        geometry,
         length,
+        key_offset,
+        iv_offset,
+        input_offset,
+        output_offset,
         (int) status);
 
       goto out;
@@ -381,14 +512,32 @@ ngi541_run_ctr_exact_size_case (
 
   if (length != 0 &&
       memcmp (
-        plaintext.data,
+        decrypt_output.data,
         source,
         length) != 0)
     {
       fprintf (
         stderr,
-        "AES-CTR exact-size plaintext mismatch: "
-        "length=%zu\n",
+        "AES-CTR geometry plaintext mismatch: "
+        "geometry=%s length=%zu\n",
+        geometry,
+        length);
+
+      goto out;
+    }
+
+
+  if (length != 0 &&
+      memcmp (
+        decrypt_input.data,
+        reference,
+        length) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR geometry decrypt modified input: "
+        "geometry=%s length=%zu\n",
+        geometry,
         length);
 
       goto out;
@@ -396,20 +545,35 @@ ngi541_run_ctr_exact_size_case (
 
 
   /*
-   * Ciphertext is const input to the public decrypt operation.
-   * Verify that execution did not modify it in place.
+   * key and IV are const inputs to the public contract.
    */
-  if (length != 0 &&
-      memcmp (
-        ciphertext.data,
-        reference,
-        length) != 0)
+  if (memcmp (
+        key.data,
+        key_material,
+        sizeof (key_material)) != 0)
     {
       fprintf (
         stderr,
-        "AES-CTR decrypt modified ciphertext input: "
-        "length=%zu\n",
-        length);
+        "AES-CTR geometry modified key: "
+        "geometry=%s offset=%zu\n",
+        geometry,
+        key_offset);
+
+      goto out;
+    }
+
+
+  if (memcmp (
+        iv.data,
+        iv_material,
+        sizeof (iv_material)) != 0)
+    {
+      fprintf (
+        stderr,
+        "AES-CTR geometry modified IV: "
+        "geometry=%s offset=%zu\n",
+        geometry,
+        iv_offset);
 
       goto out;
     }
@@ -420,13 +584,22 @@ ngi541_run_ctr_exact_size_case (
 
 out:
   ngi541_test_buffer_free (
-    &plaintext);
+    &decrypt_output);
 
   ngi541_test_buffer_free (
-    &ciphertext);
+    &decrypt_input);
 
   ngi541_test_buffer_free (
-    &input);
+    &encrypt_output);
+
+  ngi541_test_buffer_free (
+    &encrypt_input);
+
+  ngi541_test_buffer_free (
+    &iv);
+
+  ngi541_test_buffer_free (
+    &key);
 
   return result;
 }
@@ -446,7 +619,15 @@ main (void)
     127, 128, 129,
   };
 
+  static const size_t offsets[] =
+  {
+    1, 2, 3, 7, 15,
+  };
+
   ngi541_status_t status;
+
+  size_t exact_size_cases = 0;
+  size_t unaligned_cases = 0;
 
 
   status =
@@ -464,21 +645,111 @@ main (void)
     }
 
 
+  /*
+   * M5.2.4a:
+   * aligned exact-size boundary corpus.
+   */
   for (
     size_t i = 0;
     i < sizeof (lengths) / sizeof (lengths[0]);
     i++)
     {
-      if (ngi541_run_ctr_exact_size_case (
-            lengths[i]) != 0)
+      if (ngi541_run_ctr_geometry_case (
+            "exact-size",
+            lengths[i],
+            0,
+            0,
+            0,
+            0) != 0)
         return 1;
+
+      exact_size_cases++;
+    }
+
+
+  /*
+   * M5.2.4b:
+   *
+   * Deliberately misalign one public buffer at a time.
+   *
+   * Length zero is already covered by M5.2.4a. Alignment has no
+   * meaning for the NULL zero-length data path, so begin at index 1.
+   */
+  for (
+    size_t offset_index = 0;
+    offset_index <
+      sizeof (offsets) / sizeof (offsets[0]);
+    offset_index++)
+    {
+      size_t offset =
+        offsets[offset_index];
+
+      for (
+        size_t length_index = 1;
+        length_index <
+          sizeof (lengths) / sizeof (lengths[0]);
+        length_index++)
+        {
+          size_t length =
+            lengths[length_index];
+
+
+          if (ngi541_run_ctr_geometry_case (
+                "unaligned-key",
+                length,
+                offset,
+                0,
+                0,
+                0) != 0)
+            return 1;
+
+          unaligned_cases++;
+
+
+          if (ngi541_run_ctr_geometry_case (
+                "unaligned-iv",
+                length,
+                0,
+                offset,
+                0,
+                0) != 0)
+            return 1;
+
+          unaligned_cases++;
+
+
+          if (ngi541_run_ctr_geometry_case (
+                "unaligned-input",
+                length,
+                0,
+                0,
+                offset,
+                0) != 0)
+            return 1;
+
+          unaligned_cases++;
+
+
+          if (ngi541_run_ctr_geometry_case (
+                "unaligned-output",
+                length,
+                0,
+                0,
+                0,
+                offset) != 0)
+            return 1;
+
+          unaligned_cases++;
+        }
     }
 
 
   printf (
-    "AES-CTR exact-size buffer geometry passed: "
-    "%zu lengths\n",
-    sizeof (lengths) / sizeof (lengths[0]));
+    "AES-CTR buffer geometry passed: "
+    "exact_size=%zu unaligned=%zu total=%zu\n",
+    exact_size_cases,
+    unaligned_cases,
+    exact_size_cases + unaligned_cases);
 
   return 0;
 }
