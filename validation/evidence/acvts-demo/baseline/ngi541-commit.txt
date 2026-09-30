@@ -1,0 +1,3 @@
+v0.1.0 commit: be5b8db305b557bbf079dc262e34532dacc00ade
+HEAD at evidence collection: be5b8db305b557bbf079dc262e34532dacc00ade
+Tracked worktree clean at collection: yes

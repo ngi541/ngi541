@@ -1,0 +1,99 @@
+{
+  "isSample": false,
+  "registration": [
+    {
+      "algorithm": "ACVP-AES-CBC",
+      "direction": [
+        "encrypt",
+        "decrypt"
+      ],
+      "keyLen": [
+        128,
+        192,
+        256
+      ],
+      "revision": "1.0"
+    },
+    {
+      "algorithm": "ACVP-AES-CTR",
+      "direction": [
+        "encrypt",
+        "decrypt"
+      ],
+      "incrementalCounter": true,
+      "keyLen": [
+        128,
+        192,
+        256
+      ],
+      "overflowCounter": false,
+      "payloadLen": [
+        {
+          "increment": 8,
+          "max": 128,
+          "min": 8
+        }
+      ],
+      "performCounterTests": true,
+      "revision": "1.0"
+    },
+    {
+      "aadLen": [
+        {
+          "increment": 8,
+          "max": 65536,
+          "min": 0
+        }
+      ],
+      "algorithm": "ACVP-AES-GCM",
+      "direction": [
+        "encrypt",
+        "decrypt"
+      ],
+      "ivGen": "external",
+      "ivGenMode": "8.2.1",
+      "ivLen": [
+        96
+      ],
+      "keyLen": [
+        128,
+        192,
+        256
+      ],
+      "payloadLen": [
+        {
+          "increment": 8,
+          "max": 65536,
+          "min": 0
+        }
+      ],
+      "revision": "1.0",
+      "tagLen": [
+        128
+      ]
+    },
+    {
+      "algorithm": "SHA2-256",
+      "messageLength": [
+        {
+          "increment": 8,
+          "max": 65536,
+          "min": 0
+        }
+      ],
+      "revision": "1.0"
+    },
+    {
+      "algorithm": "SHA2-224",
+      "messageLength": [
+        {
+          "increment": 8,
+          "max": 65536,
+          "min": 0
+        }
+      ],
+      "revision": "1.0"
+    }
+  ],
+  "testSessionUrl": "/acvp/v1/testSessions/772630"
+}

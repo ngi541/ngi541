@@ -1,0 +1,40 @@
+{
+  "testSessionUrl": "/acvp/v1/testSessions/772630",
+  "vectorSets": [
+    {
+      "algorithm": "ACVP-AES-CBC",
+      "disposition": "passed",
+      "revision": "1.0",
+      "url": "/acvp/v1/testSessions/772630/vectorSets/4066333",
+      "vsId": 4066333
+    },
+    {
+      "algorithm": "ACVP-AES-CTR",
+      "disposition": "passed",
+      "revision": "1.0",
+      "url": "/acvp/v1/testSessions/772630/vectorSets/4066334",
+      "vsId": 4066334
+    },
+    {
+      "algorithm": "ACVP-AES-GCM",
+      "disposition": "passed",
+      "revision": "1.0",
+      "url": "/acvp/v1/testSessions/772630/vectorSets/4066335",
+      "vsId": 4066335
+    },
+    {
+      "algorithm": "SHA2-256",
+      "disposition": "passed",
+      "revision": "1.0",
+      "url": "/acvp/v1/testSessions/772630/vectorSets/4066336",
+      "vsId": 4066336
+    },
+    {
+      "algorithm": "SHA2-224",
+      "disposition": "passed",
+      "revision": "1.0",
+      "url": "/acvp/v1/testSessions/772630/vectorSets/4066337",
+      "vsId": 4066337
+    }
+  ]
+}

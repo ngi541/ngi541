@@ -1,0 +1,13 @@
+{
+  "addressUrl": "/acvp/v1/vendors/14566/addresses/14518",
+  "contactUrls": [
+    "/acvp/v1/persons/16786"
+  ],
+  "description": "NGI541 is a standalone, performance-oriented software cryptographic execution engine with SIMD-oriented execution paths and an independent public API. It incorporates selected cryptographic components derived from FD.io VPP native crypto, refactored and hardened through differential reference validation, SIMD-path verification, sanitizer testing, memory and buffer-geometry verification, and correction of defects identified in the inherited core code. Version 0.1.0 supports AES-CBC, AES-CTR, AES-GCM, SHA2-224, and SHA2-256.",
+  "name": "NGI541",
+  "type": "Software",
+  "url": "/acvp/v1/modules/15504",
+  "vendorUrl": "/acvp/v1/vendors/14566",
+  "version": "0.1.0",
+  "website": "https://ngi541.org"
+}

@@ -1,0 +1,18 @@
+{
+  "dependencies": [
+    {
+      "description": "Intel Core i7-4770HQ @ 2.20 GHz, x86_64 architecture.",
+      "name": "Intel Core i7-4770HQ",
+      "type": "cpu",
+      "url": "/acvp/v1/dependencies/33783"
+    },
+    {
+      "description": "Apple macOS 12.7.6 (Darwin 21.6.0), x86_64.",
+      "name": "macOS 12.7.6",
+      "type": "os",
+      "url": "/acvp/v1/dependencies/33784"
+    }
+  ],
+  "name": "macOS 12.7.6 on Intel Core i7-4770HQ",
+  "url": "/acvp/v1/oes/34738"
+}

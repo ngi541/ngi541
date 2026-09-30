@@ -1,0 +1,39 @@
+NGI541 ACVTS Demo validation environment
+
+Runtime environment
+-------------------
+OS: macOS 12.7.6
+OS build: 21H1320
+Darwin: 21.6.0
+Architecture: x86_64
+CPU: Intel(R) Core(TM) i7-4770HQ CPU @ 2.20GHz
+
+Validation/build tooling
+------------------------
+Git:
+git version 2.37.1 (Apple Git-137.1)
+
+Compiler:
+Apple clang version 14.0.0 (clang-1400.0.29.202)
+Target: x86_64-apple-darwin21.6.0
+Thread model: posix
+InstalledDir: /Library/Developer/CommandLineTools/usr/bin
+
+CMake:
+cmake version 4.4.3
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+
+curl:
+curl 8.22.0 (x86_64-apple-darwin21.6.0) libcurl/8.22.0 OpenSSL/3.6.4 zlib/1.2.11 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.23.3 libssh2/1.11.1 nghttp2/1.70.0 ngtcp2/1.25.0 nghttp3/1.18.0 mit-krb5/1.7-prerelease OpenLDAP/2.4.28/Apple
+Release-Date: 2026-09-02
+Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss
+Features: alt-svc AppleSecTrust AsynchDNS brotli GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy IDN IPv6 Kerberos Largefile libz PSL SPNEGO SSL threadsafe UnixSockets zstd
+
+OpenSSL:
+OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)
+
+Notes
+-----
+OpenSSL is recorded as validation/reference tooling only.
+NGI541 0.1.0 has no production OpenSSL runtime dependency.
