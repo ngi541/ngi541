@@ -210,6 +210,18 @@ function(ngi541_resolve_acvp_curl out_root)
         REQUIRED
     )
 
+    if(
+        DEFINED CURL_VERSION_STRING
+        AND
+        CURL_VERSION_STRING VERSION_LESS "7.80.0"
+    )
+        message(
+            FATAL_ERROR
+            "NGI541 ACVP online mode requires libcurl >= 7.80.0; "
+            "found ${CURL_VERSION_STRING}"
+        )
+    endif()
+
     if(NOT TARGET CURL::libcurl)
         message(
             FATAL_ERROR

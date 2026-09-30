@@ -14,76 +14,92 @@ ACVP_RESULT
 ngi541_acvp_register_profile_v1 (
   ACVP_CTX *ctx)
 {
+  return
+    ngi541_acvp_register_profile_v1_selected (
+      ctx,
+      NGI541_ACVP_PROFILE_V1_ALL);
+}
+
+
+ACVP_RESULT
+ngi541_acvp_register_profile_v1_selected (
+  ACVP_CTX *ctx,
+  unsigned int profile_mask)
+{
   ACVP_RESULT result;
 
-  result =
-    acvp_cap_sym_cipher_enable (
-      ctx,
-      ACVP_AES_CBC,
-      ngi541_acvp_aes_cbc_handler);
+  if (profile_mask & NGI541_ACVP_PROFILE_AES_CBC)
+  {
 
-  if (result != ACVP_SUCCESS)
-    return result;
+        result =
+            acvp_cap_sym_cipher_enable (
+            ctx,
+            ACVP_AES_CBC,
+            ngi541_acvp_aes_cbc_handler);
 
-  result =
-    acvp_cap_sym_cipher_set_parm (
-      ctx,
-      ACVP_AES_CBC,
-      ACVP_SYM_CIPH_PARM_DIR,
-      ACVP_SYM_CIPH_DIR_BOTH);
+        if (result != ACVP_SUCCESS)
+            return result;
 
-  if (result != ACVP_SUCCESS)
-    return result;
+        result =
+            acvp_cap_sym_cipher_set_parm (
+            ctx,
+            ACVP_AES_CBC,
+            ACVP_SYM_CIPH_PARM_DIR,
+            ACVP_SYM_CIPH_DIR_BOTH);
 
-  result =
-    acvp_cap_sym_cipher_set_parm (
-      ctx,
-      ACVP_AES_CBC,
-      ACVP_SYM_CIPH_PARM_IVGEN_SRC,
-      ACVP_SYM_CIPH_IVGEN_SRC_NA);
+        if (result != ACVP_SUCCESS)
+            return result;
 
-  if (result != ACVP_SUCCESS)
-    return result;
+        result =
+            acvp_cap_sym_cipher_set_parm (
+            ctx,
+            ACVP_AES_CBC,
+            ACVP_SYM_CIPH_PARM_IVGEN_SRC,
+            ACVP_SYM_CIPH_IVGEN_SRC_NA);
 
-  result =
-    acvp_cap_sym_cipher_set_parm (
-      ctx,
-      ACVP_AES_CBC,
-      ACVP_SYM_CIPH_PARM_IVGEN_MODE,
-      ACVP_SYM_CIPH_IVGEN_MODE_NA);
+        if (result != ACVP_SUCCESS)
+            return result;
 
-  if (result != ACVP_SUCCESS)
-    return result;
+        result =
+            acvp_cap_sym_cipher_set_parm (
+            ctx,
+            ACVP_AES_CBC,
+            ACVP_SYM_CIPH_PARM_IVGEN_MODE,
+            ACVP_SYM_CIPH_IVGEN_MODE_NA);
 
-  result =
-    acvp_cap_sym_cipher_set_parm (
-      ctx,
-      ACVP_AES_CBC,
-      ACVP_SYM_CIPH_KEYLEN,
-      128);
+        if (result != ACVP_SUCCESS)
+            return result;
 
-  if (result != ACVP_SUCCESS)
-    return result;
+        result =
+            acvp_cap_sym_cipher_set_parm (
+            ctx,
+            ACVP_AES_CBC,
+            ACVP_SYM_CIPH_KEYLEN,
+            128);
 
-  result =
-    acvp_cap_sym_cipher_set_parm (
-      ctx,
-      ACVP_AES_CBC,
-      ACVP_SYM_CIPH_KEYLEN,
-      192);
+        if (result != ACVP_SUCCESS)
+            return result;
 
-  if (result != ACVP_SUCCESS)
-    return result;
+        result =
+            acvp_cap_sym_cipher_set_parm (
+            ctx,
+            ACVP_AES_CBC,
+            ACVP_SYM_CIPH_KEYLEN,
+            192);
 
-  result =
-    acvp_cap_sym_cipher_set_parm (
-      ctx,
-      ACVP_AES_CBC,
-      ACVP_SYM_CIPH_KEYLEN,
-      256);
+        if (result != ACVP_SUCCESS)
+            return result;
 
-  if (result != ACVP_SUCCESS)
-    return result;
+        result =
+            acvp_cap_sym_cipher_set_parm (
+            ctx,
+            ACVP_AES_CBC,
+            ACVP_SYM_CIPH_KEYLEN,
+            256);
+
+        if (result != ACVP_SUCCESS)
+            return result;
+    }
 
   /*
    * AES-CTR
@@ -91,6 +107,9 @@ ngi541_acvp_register_profile_v1 (
    * NGI541 uses an incrementing 128-bit counter block.
    * Counter overflow support is intentionally not advertised.
    */
+
+if (profile_mask & NGI541_ACVP_PROFILE_AES_CTR)
+  {
 
   result =
     acvp_cap_sym_cipher_enable (
@@ -182,6 +201,7 @@ ngi541_acvp_register_profile_v1 (
 
   if (result != ACVP_SUCCESS)
     return result;
+  }
 
   /*
    * AES-GCM
@@ -198,6 +218,9 @@ ngi541_acvp_register_profile_v1 (
    * IV generation is external. NGI541 consumes the IV supplied
    * by the ACVP test case and does not generate GCM IVs.
    */
+
+if (profile_mask & NGI541_ACVP_PROFILE_AES_GCM)
+  {
 
   result =
     acvp_cap_sym_cipher_enable (
@@ -279,13 +302,11 @@ if (result != ACVP_SUCCESS)
    * Registration domains are expressed in bits.
    */
   result =
-    acvp_cap_sym_cipher_set_domain (
-      ctx,
-      ACVP_AES_GCM,
-      ACVP_SYM_CIPH_DOMAIN_IVLEN,
-      96,
-      96,
-      8);
+  acvp_cap_sym_cipher_set_parm (
+    ctx,
+    ACVP_AES_GCM,
+    ACVP_SYM_CIPH_IVLEN,
+    96);
 
   if (result != ACVP_SUCCESS)
     return result;
@@ -336,6 +357,8 @@ if (result != ACVP_SUCCESS)
   if (result != ACVP_SUCCESS)
     return result;
 
+  }
+
   /*
    * SHA2-256
    *
@@ -344,26 +367,29 @@ if (result != ACVP_SUCCESS)
    *
    * ACVP registration domains are expressed in bits.
    */
-  result =
-    acvp_cap_hash_enable (
-      ctx,
-      ACVP_HASH_SHA256,
-      ngi541_acvp_sha2_handler);
+  if (profile_mask & NGI541_ACVP_PROFILE_SHA2_256)
+    {
+      result =
+        acvp_cap_hash_enable (
+          ctx,
+          ACVP_HASH_SHA256,
+          ngi541_acvp_sha2_handler);
 
-  if (result != ACVP_SUCCESS)
-    return result;
+      if (result != ACVP_SUCCESS)
+        return result;
 
-  result =
-    acvp_cap_hash_set_domain (
-      ctx,
-      ACVP_HASH_SHA256,
-      ACVP_HASH_MESSAGE_LEN,
-      0,
-      65536,
-      8);
+      result =
+        acvp_cap_hash_set_domain (
+          ctx,
+          ACVP_HASH_SHA256,
+          ACVP_HASH_MESSAGE_LEN,
+          0,
+          65536,
+          8);
 
-  if (result != ACVP_SUCCESS)
-    return result;
+      if (result != ACVP_SUCCESS)
+        return result;
+    }
 
   /*
    * SHA2-224
@@ -373,26 +399,29 @@ if (result != ACVP_SUCCESS)
    *
    * ACVP registration domains are expressed in bits.
    */
-  result =
-    acvp_cap_hash_enable (
-      ctx,
-      ACVP_HASH_SHA224,
-      ngi541_acvp_sha2_handler);
+  if (profile_mask & NGI541_ACVP_PROFILE_SHA2_224)
+    {
+      result =
+        acvp_cap_hash_enable (
+          ctx,
+          ACVP_HASH_SHA224,
+          ngi541_acvp_sha2_handler);
 
-  if (result != ACVP_SUCCESS)
-    return result;
+      if (result != ACVP_SUCCESS)
+        return result;
 
-  result =
-    acvp_cap_hash_set_domain (
-      ctx,
-      ACVP_HASH_SHA224,
-      ACVP_HASH_MESSAGE_LEN,
-      0,
-      65536,
-      8);
+      result =
+        acvp_cap_hash_set_domain (
+          ctx,
+          ACVP_HASH_SHA224,
+          ACVP_HASH_MESSAGE_LEN,
+          0,
+          65536,
+          8);
 
-  if (result != ACVP_SUCCESS)
-    return result;
+      if (result != ACVP_SUCCESS)
+        return result;
+    }
 
   return ACVP_SUCCESS;
 }

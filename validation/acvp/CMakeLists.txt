@@ -273,4 +273,38 @@ if(NGI541_ENABLE_ACVP_ONLINE)
         PRIVATE
             ngi541_acvp_online_adapter
     )
+
+    # -----------------------------------------------------------------------
+    # ACVTS Demo client
+    #
+    # This target is deliberately separate from the offline ACVP runner and
+    # from the no-network online build probe.
+    #
+    # The TOTP implementation is compiled directly from the pinned libacvp
+    # source tree so NGI541 does not maintain an independent TOTP algorithm.
+    # -----------------------------------------------------------------------
+
+    add_executable(
+        ngi541_acvp_demo
+
+        demo_main.c
+
+        "${NGI541_LIBACVP_SOURCE_DIR}/app/totp/totp.c"
+        "${NGI541_LIBACVP_SOURCE_DIR}/app/totp/hmac_sha256.c"
+        "${NGI541_LIBACVP_SOURCE_DIR}/app/totp/sha256.c"
+    )
+
+    target_include_directories(
+        ngi541_acvp_demo
+        PRIVATE
+            "${NGI541_LIBACVP_SOURCE_DIR}/app"
+            "${NGI541_LIBACVP_SOURCE_DIR}/app/totp"
+            "${NGI541_LIBACVP_SOURCE_DIR}/safe_c_stub/include"
+    )
+
+    target_link_libraries(
+        ngi541_acvp_demo
+        PRIVATE
+            ngi541_acvp_online_adapter
+    )
 endif()
