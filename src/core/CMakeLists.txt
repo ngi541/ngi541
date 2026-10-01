@@ -22,7 +22,7 @@ add_library(
 target_include_directories(
     ngi541_core
     INTERFACE
-        ${PROJECT_SOURCE_DIR}/src
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
 )
 
 target_link_libraries(
@@ -30,4 +30,16 @@ target_link_libraries(
     INTERFACE
         NGI541::support
         ngi541_crypto_isa
+)
+
+set_target_properties(
+    ngi541_core
+    PROPERTIES
+        EXPORT_NAME _core
+)
+
+set_target_properties(
+    ngi541_crypto_isa
+    PROPERTIES
+        EXPORT_NAME _crypto_isa
 )

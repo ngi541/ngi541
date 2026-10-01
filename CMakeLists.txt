@@ -7,6 +7,9 @@ project(
     LANGUAGES C
 )
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 # ---------------------------------------------------------------------------
 # Global project configuration
 # ---------------------------------------------------------------------------
@@ -159,5 +162,73 @@ if(
         FATAL_ERROR
         "NGI541_BUILD_DIFFERENTIAL_TESTS requires "
         "NGI541_BUILD_ENGINE=ON"
+    )
+endif()
+
+# ---------------------------------------------------------------------------
+# Installation and CMake package
+# ---------------------------------------------------------------------------
+
+if(NGI541_BUILD_ENGINE)
+    set(
+        NGI541_INSTALL_CMAKEDIR
+        "${CMAKE_INSTALL_LIBDIR}/cmake/NGI541"
+    )
+
+    install(
+        TARGETS
+            ngi541_engine
+            ngi541_engine_shared
+            ngi541_support
+        EXPORT NGI541Targets
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+
+    install(
+        TARGETS
+            ngi541_core
+            ngi541_crypto_isa
+        EXPORT NGI541Targets
+    )
+
+    install(
+        DIRECTORY
+            "${PROJECT_SOURCE_DIR}/include/ngi541"
+        DESTINATION
+            "${CMAKE_INSTALL_INCLUDEDIR}"
+        FILES_MATCHING
+            PATTERN "*.h"
+    )
+
+    configure_package_config_file(
+        "${PROJECT_SOURCE_DIR}/cmake/NGI541Config.cmake.in"
+        "${PROJECT_BINARY_DIR}/NGI541Config.cmake"
+        INSTALL_DESTINATION
+            "${NGI541_INSTALL_CMAKEDIR}"
+    )
+
+    write_basic_package_version_file(
+        "${PROJECT_BINARY_DIR}/NGI541ConfigVersion.cmake"
+        VERSION
+            "${PROJECT_VERSION}"
+        COMPATIBILITY
+            SameMinorVersion
+    )
+
+    install(
+        EXPORT NGI541Targets
+        FILE NGI541Targets.cmake
+        NAMESPACE NGI541::
+        DESTINATION "${NGI541_INSTALL_CMAKEDIR}"
+    )
+
+    install(
+        FILES
+            "${PROJECT_BINARY_DIR}/NGI541Config.cmake"
+            "${PROJECT_BINARY_DIR}/NGI541ConfigVersion.cmake"
+        DESTINATION
+            "${NGI541_INSTALL_CMAKEDIR}"
     )
 endif()

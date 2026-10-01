@@ -231,6 +231,217 @@ cmake --build build-acvp
 
 Additional bootstrap scripts are available under [`scripts/`](scripts/) for validation and test dependencies.
 
+## Installation
+
+NGI541 provides installable public headers, static and shared libraries, and a
+CMake package for external consumers.
+
+### Build and install
+
+Configure a release build with the engine enabled:
+
+```bash
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DNGI541_BUILD_ENGINE=ON \
+  -DNGI541_BUILD_TESTS=OFF \
+  -DNGI541_BUILD_EXAMPLES=OFF
+```
+
+Build and install:
+
+```bash
+cmake --build build --parallel
+cmake --install build
+```
+
+To install into a custom prefix:
+
+```bash
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DNGI541_BUILD_ENGINE=ON \
+  -DNGI541_BUILD_TESTS=OFF \
+  -DNGI541_BUILD_EXAMPLES=OFF \
+  -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+
+cmake --build build --parallel
+cmake --install build
+```
+
+The installation contains:
+
+```text
+include/ngi541/
+├── api.h
+├── crypto.h
+└── engine.h
+
+lib/
+├── libngi541_engine.*
+├── libngi541_support.*
+└── cmake/NGI541/
+    ├── NGI541Config.cmake
+    ├── NGI541ConfigVersion.cmake
+    └── NGI541Targets*.cmake
+```
+
+`libngi541_support` and the internal exported CMake targets are implementation
+details required by the installed package. Applications should link only to the
+public NGI541 targets described below.
+
+### Using NGI541 from CMake
+
+An external CMake project can consume an installed NGI541 package with:
+
+```cmake
+cmake_minimum_required(VERSION 3.20)
+
+project(my_app LANGUAGES C)
+
+find_package(
+    NGI541
+    CONFIG
+    REQUIRED
+)
+
+add_executable(
+    my_app
+    main.c
+)
+
+target_link_libraries(
+    my_app
+    PRIVATE
+        NGI541::engine
+)
+```
+
+`NGI541::engine` is the canonical installed target for the static NGI541
+execution engine.
+
+A shared-library target is also available:
+
+```cmake
+NGI541::engine_shared
+```
+
+Applications should not depend directly on the package's internal targets:
+
+```text
+NGI541::_core
+NGI541::_support
+NGI541::_crypto_isa
+```
+
+Those targets are exported only to preserve the transitive implementation
+dependencies of the public package.
+
+### Finding a custom installation
+
+If NGI541 is installed into a non-standard prefix, provide that prefix when
+configuring the consumer:
+
+```bash
+cmake -S . -B build \
+  -DCMAKE_PREFIX_PATH="$HOME/.local"
+```
+
+Then build normally:
+
+```bash
+cmake --build build --parallel
+```
+
+### Public headers
+
+Consumers use the installed public API through:
+
+```c
+#include <ngi541/engine.h>
+```
+
+`engine.h` includes the public cryptographic API required for normal engine
+usage. Applications may also include the lower-level public headers directly
+when appropriate:
+
+```c
+#include <ngi541/api.h>
+#include <ngi541/crypto.h>
+```
+
+Cryptographic operations require explicit engine initialization:
+
+```c
+ngi541_status_t status = ngi541_engine_init ();
+```
+
+NGI541 `0.1.x` does not currently expose a public shutdown/deinitialization
+function.
+
+### Minimal consumer example
+
+```c
+#include <ngi541/engine.h>
+
+#include <stdint.h>
+#include <stdio.h>
+
+int
+main (void)
+{
+  static const uint8_t message[] = {
+    'N', 'G', 'I', '5', '4', '1'
+  };
+
+  uint8_t digest[32] = { 0 };
+
+  ngi541_hash_request_t request = {
+    .struct_size = sizeof (request),
+    .algorithm = NGI541_HASH_SHA2_256,
+    .message = message,
+    .message_len = sizeof (message),
+    .digest = digest,
+    .digest_capacity = sizeof (digest),
+  };
+
+  ngi541_status_t status = ngi541_engine_init ();
+
+  if (status != NGI541_STATUS_OK)
+    return 1;
+
+  status = ngi541_crypto_hash_compute (&request);
+
+  if (status != NGI541_STATUS_OK)
+    return 2;
+
+  for (size_t i = 0; i < sizeof (digest); i++)
+    printf ("%02x", digest[i]);
+
+  putchar ('\n');
+
+  return 0;
+}
+```
+
+For more complete public API usage examples, see
+[`examples/`](examples/).
+
+### ABI compatibility
+
+NGI541 is currently in the `0.x` development series.
+
+Patch releases within the same minor release line are treated as compatible by
+the installed CMake package. Compatibility is not guaranteed across minor
+release lines.
+
+For example:
+
+```text
+0.1.0 -> 0.1.1   same compatibility line
+0.1.x -> 0.2.x   compatibility not guaranteed
+```
+
 ## Examples
 
 Minimal examples using only the public NGI541 API are available in

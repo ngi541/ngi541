@@ -35,6 +35,12 @@ add_library(
     $<TARGET_OBJECTS:ngi541_engine_objects>
 )
 
+set_target_properties(
+    ngi541_engine
+    PROPERTIES
+        EXPORT_NAME engine
+)
+
 target_include_directories(
     ngi541_engine
     PUBLIC
@@ -75,6 +81,9 @@ set_target_properties(
     ngi541_engine_shared
     PROPERTIES
         OUTPUT_NAME ngi541_engine
+        EXPORT_NAME engine_shared
+        VERSION ${PROJECT_VERSION}
+        SOVERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
 )
 
 add_library(
