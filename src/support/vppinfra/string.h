@@ -2,6 +2,10 @@
  * Copyright (c) 2016 Cisco and/or its affiliates.
  * Copyright (c) 2001, 2002, 2003 Eliot Dresselhaus
  */
+/*
+ * Modified for NGI541: standalone compatibility and dependency-reduction changes.
+ */
+
 
 /** \file
 

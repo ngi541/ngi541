@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright(c) 2021 Damjan Marion
  */
+/*
+ * Modified for NGI541: standalone compatibility and dependency-reduction changes.
+ */
+
 
 #ifndef included_clib_memcpy_x86_64_h
 #define included_clib_memcpy_x86_64_h

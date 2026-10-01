@@ -2,6 +2,10 @@
  * SPDX-License-Identifier: Apache-2.0
  * Copyright (c) 2015 Cisco and/or its affiliates.
  */
+/*
+ * Modified for NGI541: standalone compatibility and dependency-reduction changes.
+ */
+
 
 #ifndef included_vector_avx512_h
 #define included_vector_avx512_h

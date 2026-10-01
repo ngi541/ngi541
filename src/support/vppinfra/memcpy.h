@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright(c) 2021 Cisco Systems, Inc.
  */
+/*
+ * Modified for NGI541: standalone compatibility and dependency-reduction changes.
+ */
+
 
 #include <compat/base.h>
 #ifndef included_memcpy_h

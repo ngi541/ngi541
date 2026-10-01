@@ -14,12 +14,9 @@ Its purpose is to maintain a clear and auditable distinction between:
 
 NGI541 is an independent open-source software project.
 
-Development is performed independently using personal development equipment,
-personal source-control infrastructure, and publicly available technical
-information.
-
 The NGI541 repository and its source-provenance policy were established before
-any third-party source code was imported.
+third-party source code was imported. Development after the recorded upstream
+imports is maintained in the NGI541 Git history.
 
 ## Project license
 
@@ -27,10 +24,13 @@ NGI541 is licensed under the Apache License, Version 2.0.
 
 See the repository root `LICENSE` file.
 
+Individual retained or derived third-party files may carry additional or
+alternative upstream licensing terms where recorded by their SPDX identifiers
+or embedded notices. Those notices are preserved.
+
 ## Source import policy
 
-Third-party source code incorporated into NGI541 must have traceable
-provenance.
+Third-party source incorporated into NGI541 must have traceable provenance.
 
 An import record should identify, where applicable:
 
@@ -38,11 +38,12 @@ An import record should identify, where applicable:
 2. source repository;
 3. exact upstream revision;
 4. original source path;
-5. NGI541 destination path;
-6. applicable license;
-7. preservation of applicable copyright and licensing notices;
-8. whether the source was copied, derived, or independently implemented;
-9. material NGI541 modifications.
+5. NGI541 import path;
+6. current NGI541 path, if different;
+7. applicable license;
+8. preservation of applicable copyright and licensing notices;
+9. whether the source was copied, derived, adapted, or independently implemented;
+10. material NGI541 modifications.
 
 ## Provenance log
 
@@ -53,10 +54,10 @@ An import record should identify, where applicable:
 - Project: FD.io VPP
 - Project repository: https://github.com/FDio/vpp
 - Source repository: https://gerrit.fd.io/r/vpp
-- Gerrit Change: 44827
-- Patchset: 20
-- Commit: `d7ed54b83682e753e772274409696d8fa8f8108c`
-- Parent: `48e1f751ef7726c7358a3315c69bb011a6fda946`
+- Gerrit Change: `44827`
+- Patchset: `20`
+- Upstream commit: `d7ed54b83682e753e772274409696d8fa8f8108c`
+- Upstream parent: `48e1f751ef7726c7358a3315c69bb011a6fda946`
 - License: Apache License 2.0
 
 The imported revision corresponds to the publicly available Gerrit change:
@@ -67,20 +68,27 @@ Public Gerrit change:
 
 https://gerrit.fd.io/r/c/vpp/+/44827
 
-#### Import classification
+#### Canonical NGI541 import
+
+The selected native-crypto and crypto-primitive source baseline was imported by:
+
+- NGI541 commit: `0e3b62b010a85fda82a55c9b3fd6f09cdecd7a09`
+- Tag: `vpp-44827-ps20-import`
+- Historical branch: `import/vpp-44827-ps20`
+- Commit subject: `import: add FD.io VPP crypto baseline from Gerrit 44827 PS20`
+
+The tag and historical import branch resolve to the same canonical import
+commit.
 
 Classification: **copied upstream source baseline**
 
-The initial import relocates selected upstream source files into the NGI541
-source tree.
+No algorithmic or semantic modification was intended as part of the canonical
+initial import. NGI541-specific refactoring and implementation changes are
+recorded in later commits.
 
-No algorithmic or semantic modification is intended as part of this initial
-import. NGI541-specific refactoring and implementation changes are maintained
-in subsequent commits.
+#### Initial imported-source mapping
 
-#### Imported source mapping
-
-| Upstream source | NGI541 destination |
+| Upstream source | Initial NGI541 import path |
 | --- | --- |
 | `src/vnet/crypto/crypto.h` | `src/core/crypto.h` |
 | `src/vnet/crypto/crypto.c` | `src/core/crypto.c` |
@@ -100,36 +108,51 @@ in subsequent commits.
 | `src/vppinfra/crypto/ghash.h` | `src/crypto/ghash.h` |
 | `src/vppinfra/crypto/sha2.h` | `src/crypto/sha2.h` |
 
-#### Copyright and licensing notices
+#### Current derived-source mapping
 
-The initial import preserves the applicable SPDX license identifiers,
-copyright notices, and other licensing notices contained in the upstream
-source files.
+The current production tree preserves the following traceable lineage from the
+canonical import:
 
-Upstream copyright notices are not replaced by NGI541 copyright notices.
+| Upstream source | Initial NGI541 path | Current NGI541 path |
+| --- | --- | --- |
+| `src/vppinfra/crypto/aes.h` | `src/crypto/aes.h` | `src/core/aes/aes.h` |
+| `src/vppinfra/crypto/aes_cbc.h` | `src/crypto/aes_cbc.h` | `src/core/aes/aes_cbc.h` |
+| `src/vppinfra/crypto/aes_ctr.h` | `src/crypto/aes_ctr.h` | `src/core/aes/aes_ctr.h` |
+| `src/vppinfra/crypto/aes_gcm.h` | `src/crypto/aes_gcm.h` | `src/core/aes/aes_gcm.h` |
+| `src/vppinfra/crypto/ghash.h` | `src/crypto/ghash.h` | `src/core/aes/ghash.h` |
+| `src/vppinfra/crypto/sha2.h` | `src/crypto/sha2.h` | `src/core/sha/sha2.h` |
+| `src/crypto_engines/native/aes_cbc.c` | `src/engines/native/aes_cbc.c` | `src/engine/handlers/aes_cbc.c` |
+| `src/crypto_engines/native/aes_ctr.c` | `src/engines/native/aes_ctr.c` | `src/engine/handlers/aes_ctr.c` |
+| `src/crypto_engines/native/aes_gcm.c` | `src/engines/native/aes_gcm.c` | `src/engine/handlers/aes_gcm.c` |
+| `src/crypto_engines/native/sha2.c` | `src/engines/native/sha2.c` | `src/engine/handlers/sha2.c` |
+| `src/crypto_engines/native/sha2.h` | `src/engines/native/sha2.h` | `src/engine/handlers/sha2.h` |
+| `src/crypto_engines/native/main.c` | `src/engines/native/main.c` | `src/engine/native.c` |
+| `src/vnet/crypto/crypto.h` | `src/core/crypto.h` | `src/engine/internal/crypto_types.h` |
 
-Files subsequently modified by NGI541 will retain applicable upstream notices
-and will be identified as modified where required.
+The `crypto.h` lineage passed through intermediate standalone paths
+`src/engine/crypto.h` and `src/engine/crypto_types.h` before reaching
+`src/engine/internal/crypto_types.h`.
 
-#### Development boundary
+The imported native interface was also progressively internalized. The
+upstream-derived `src/crypto_engines/native/crypto_native.h` was imported as
+`src/engines/native/crypto_native.h`, later moved through the standalone engine
+layout, and was internalized as `src/engine/internal/native.h`.
+`src/engine/internal/provider.h` was created during the same internalization
+phase to express the NGI541-internal provider ABI.
 
-Only publicly available FD.io VPP source code from the revision identified
-above is used as the source for this import.
+The current public execution facade, including `src/engine/execute.c` and
+`src/engine/internal/execute.h`, is original NGI541 code and was introduced
+after the upstream import.
 
-No private repository, non-public branch, unpublished patch, internal design
-document, non-public benchmark result, customer information, or other
-confidential material forms part of this import.
+### 2026-09-17 — VPPInfra support baseline
 
-NGI541-specific development following this baseline is maintained separately
-in the NGI541 Git history.
+A limited VPPInfra compatibility baseline required by the imported crypto core
+was imported from the same recorded upstream VPP revision by:
 
-#### Imported support infrastructure
+- NGI541 commit: `c34f2e8d69c92abe6f08d398789ff5a613973172`
+- Commit subject: `import: add VPP infrastructure required by crypto core`
 
-The cryptographic core depends on a limited subset of FD.io VPP
-infrastructure headers.
-
-The following files were imported from the same upstream revision without
-semantic modification:
+#### Imported VPPInfra mapping
 
 | Upstream source | NGI541 destination |
 | --- | --- |
@@ -151,65 +174,150 @@ semantic modification:
 | `src/vppinfra/vector_sse42.h` | `src/support/vppinfra/vector_sse42.h` |
 | `src/vppinfra/warnings.h` | `src/support/vppinfra/warnings.h` |
 
-These files form the initial compatibility layer required by the imported
-cryptographic core.
+The VPPInfra files are intentionally isolated under `src/support/vppinfra/` so
+that the compatibility dependency can be reduced independently from the crypto
+algorithms.
 
-They are intentionally isolated under `src/support/vppinfra/` so that their
-future replacement or reduction can be performed independently from the
-cryptographic algorithms.
+### Standalone extraction and dependency minimization
 
-#### NGI541 modification phase
+The standalone extraction proceeded through traceable follow-up commits.
 
-Following the exact upstream import, NGI541 development modifies the imported
-crypto and engine sources to use the NGI541 source-tree layout.
+#### Standalone engine baseline
 
-The first modification phase replaces upstream VPP source-tree include paths
-with NGI541 internal paths while preserving the imported cryptographic
-algorithms, operation model, engine model, and low-level support implementation.
+Commit:
 
-The compatibility files under `src/support/vppinfra/` remain unmodified from
-the recorded upstream baseline at this stage.
+`4572ec1418058d9659ba31f23bb43d0961442552`
 
-## FD.io VPP baseline
+Subject:
 
-Repository:
-https://gerrit.fd.io/r/vpp
+`crypto: establish standalone native engine baseline`
 
-Baseline commit:
-d7ed54b83682e753e772274409696d8fa8f8108c
+This phase reorganized the imported engine and temporarily expanded the
+VPPInfra dependency closure needed to establish a working standalone baseline.
 
-The NGI541 native crypto engine and selected supporting crypto and
-VPPInfra files were extracted from this historical VPP baseline.
+It also introduced `src/support/compat/string.c`, an original NGI541
+implementation of the compatibility symbol required by the retained VPPInfra
+string helpers. It is not copied from the upstream VPP `string.c`
+implementation.
 
-### VPPInfra support
+#### VPPInfra dependency minimization
 
-`src/support/vppinfra/` contains selected Apache-2.0 licensed VPPInfra
-headers required by the extracted crypto implementation.
+Commit:
 
-NGI541 does not vendor or depend on the complete VPPInfra runtime.
+`3817964b8a20c23f18f34b8aeaf741d906ee81c9`
 
-### Compatibility implementation
+Subject:
 
-`src/support/compat/string.c` is an NGI541 implementation of the
-compatibility symbol required by the imported VPPInfra string helpers.
-It replaces the VPP runtime dependency chain that would otherwise pull
-in error formatting, dynamic vectors, the VPP memory allocator, and OS
-runtime support.
+`support: minimize standalone VPPInfra dependency closure`
 
-This file is original NGI541 code and is not copied from the upstream
-VPP `string.c` implementation.
+This phase removed the broad VPP runtime dependency chain and retained only the
+low-level support required by the crypto/SIMD implementation.
 
-## Standalone extraction boundary
+The originally imported files:
 
-The NGI541 production engine is derived from the FD.io VPP native
-crypto implementation at the recorded historical baseline.
+- `src/support/vppinfra/atomics.h`
+- `src/support/vppinfra/bitops.h`
+- `src/support/vppinfra/clib.h`
+- `src/support/vppinfra/error_bootstrap.h`
 
-The VPP `vnet/crypto` runtime/framework is not carried forward as a
-production dependency. NGI541 retains only the engine contract,
-native handlers, required crypto primitives, and selected supporting
-VPPInfra headers.
+were removed during this minimization phase.
 
-Runtime/framework code from the original VPP implementation may be
-consulted as historical reference, but future validation interfaces
-are developed independently around standardized cryptographic
-validation requirements.
+Additional VPPInfra runtime files that had been temporarily introduced during
+the standalone-baseline work were also removed. They remain traceable in Git
+history but are not part of the current production source tree.
+
+The following compatibility headers were introduced during dependency
+minimization:
+
+- `src/support/compat/assert.h`
+- `src/support/compat/base.h`
+- `src/support/compat/compiler.h`
+- `src/support/compat/cpu.h`
+
+These files are NGI541 compatibility adaptations derived from selected VPPInfra
+definitions and primitives. Applicable upstream copyright and SPDX notices are
+retained.
+
+### Internal execution architecture
+
+Later NGI541 commits established a public execution facade and internalized the
+provider ABI.
+
+Relevant commits include:
+
+- `40d27aea29ec3c90740f8790d5b96a0d7ff4db7b` —
+  `engine: internalize provider ABI and adopt NGI541 namespace`
+- `4b053a2c69cd8ba8d20a72df3a105162dfd4ef48` —
+  `engine: add public execution facade`
+
+These changes separate the public NGI541 execution API from the retained and
+adapted native cryptographic implementation.
+
+The VPP `vnet/crypto` runtime/framework is not a production dependency of
+NGI541.
+
+## Modification and attribution policy
+
+Current VPP-derived files retain applicable upstream SPDX identifiers,
+copyright notices, and embedded third-party notices.
+
+Current files that have been modified or adapted for NGI541 carry an explicit
+`Modified for NGI541:` or equivalent adaptation notice in the source header.
+
+At the current audited baseline, the following retained VPPInfra files remain
+byte-for-byte unchanged from the recorded NGI541 VPPInfra import commit:
+
+- `src/support/vppinfra/vector_altivec.h`
+- `src/support/vppinfra/vector_neon.h`
+- `src/support/vppinfra/warnings.h`
+
+They retain their upstream notices and do not carry an NGI541 modification
+notice because the current file content is unchanged from that import
+baseline.
+
+`src/core/aes/ghash.h` retains an Intel Corporation copyright and redistribution
+notice that was present in the upstream-derived source. The complete
+redistribution conditions and disclaimer remain embedded in that source file.
+
+All current tracked C and header files in the audited production, validation,
+and test source trees carry an SPDX or equivalent license marker.
+
+## Third-party validation dependency — Cisco libacvp
+
+NGI541 uses Cisco `libacvp` as a validation-only dependency for ACVP/ACVTS
+integration.
+
+The dependency is recorded as a Git submodule:
+
+- Path: `third_party/libacvp`
+- Repository: `https://github.com/cisco/libacvp.git`
+- Version tag: `v2.3.1`
+- Pinned commit: `91a49ff512d14ffba6cc1ef52d8185c9e1f3735e`
+- License: Apache License 2.0
+
+`libacvp` is not a production dependency of the NGI541 cryptographic execution
+engine. The ACVP adapter uses the NGI541 public execution API.
+
+## Development boundary
+
+Only publicly available upstream open-source material identified in this
+provenance record is used as the source for the recorded third-party imports.
+
+No private VPP repository, non-public branch, unpublished patch, internal
+design document, customer information, or other confidential material forms
+part of the recorded imports.
+
+NGI541-specific changes following the upstream baselines are maintained in the
+NGI541 Git history.
+
+## Validated standalone baseline
+
+NGI541 version `0.1.0` is identified by Git tag `v0.1.0`, resolving to:
+
+`be5b8db305b557bbf079dc262e34532dacc00ade`
+
+That immutable baseline is the code associated with NIST ACVTS Demo Validation
+ID `A11030`.
+
+The NIST ACVTS Demo validation is not a Production CAVP certificate and is not
+a FIPS 140 validation.

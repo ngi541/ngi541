@@ -2,6 +2,10 @@
  * Copyright (c) 2015 Cisco and/or its affiliates.
  * Copyright (c) 2004 Eliot Dresselhaus
  */
+/*
+ * Modified for NGI541: standalone compatibility and dependency-reduction changes.
+ */
+
 
 #ifndef included_clib_byte_order_h
 #define included_clib_byte_order_h
