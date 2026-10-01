@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(
     NGI541
     VERSION 0.1.0
-    DESCRIPTION "High-performance vectorized cryptographic engine"
+    DESCRIPTION "Verification-first, performance-oriented cryptographic execution engine"
     LANGUAGES C
 )
 

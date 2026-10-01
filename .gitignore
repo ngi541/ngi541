@@ -44,3 +44,6 @@ secrets/
 # Temporary files
 *.tmp
 *.temp
+# NGI541 out-of-tree build directories
+/build/
+/build-*/
