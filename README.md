@@ -231,6 +231,39 @@ cmake --build build-acvp
 
 Additional bootstrap scripts are available under [`scripts/`](scripts/) for validation and test dependencies.
 
+## Examples
+
+Minimal examples using only the public NGI541 API are available in
+[`examples/`](examples/).
+
+They demonstrate:
+
+- SHA-256 hashing;
+- AES-128-CTR encryption and decryption;
+- AES-128-GCM authenticated encryption and decryption.
+
+Build NGI541 with the examples enabled:
+
+```bash
+cmake -S . -B build \
+  -DNGI541_BUILD_ENGINE=ON \
+  -DNGI541_BUILD_EXAMPLES=ON
+
+cmake --build build
+```
+
+Run them:
+
+```bash
+./build/examples/ngi541_example_sha256
+./build/examples/ngi541_example_aes_ctr
+./build/examples/ngi541_example_aes_gcm
+```
+
+The examples use only the public NGI541 API and link against the NGI541::engine CMake target.
+
+See [`examples/README.md`](examples/README.md) for API usage and security notes.
+
 ## Project status
 
 NGI541 is under active development.

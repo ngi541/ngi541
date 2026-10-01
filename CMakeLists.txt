@@ -43,6 +43,12 @@ option(
 )
 
 option(
+    NGI541_BUILD_EXAMPLES
+    "Build NGI541 public API examples"
+    OFF
+)
+
+option(
     NGI541_ENABLE_STRICT_WARNINGS
     "Enable additional compiler warnings"
     ON
@@ -76,6 +82,13 @@ if(NGI541_BUILD_ACVP AND NOT NGI541_BUILD_ENGINE)
     )
 endif()
 
+if(NGI541_BUILD_EXAMPLES AND NOT NGI541_BUILD_ENGINE)
+    message(
+        FATAL_ERROR
+        "NGI541_BUILD_EXAMPLES requires NGI541_BUILD_ENGINE=ON"
+    )
+endif()
+
 if(NGI541_ENABLE_ACVP_ONLINE AND NOT NGI541_BUILD_ACVP)
     message(
         FATAL_ERROR
@@ -99,6 +112,14 @@ include(NGI541Sanitizers)
 # ---------------------------------------------------------------------------
 
 add_subdirectory(src)
+
+# ---------------------------------------------------------------------------
+# Examples
+# ---------------------------------------------------------------------------
+
+if(NGI541_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
 
 # ---------------------------------------------------------------------------
 # Validation
