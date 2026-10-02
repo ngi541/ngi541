@@ -14,8 +14,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ngi541/ngi541/actions">
-    <img alt="CI" src="https://github.com/ngi541/ngi541/actions/workflows/ci.yml/badge.svg">
+  <a href="https://github.com/ngi541/ngi541/actions/workflows/ci.yml?query=branch%3Amain">
+    <img
+      alt="CI"
+      src="https://github.com/ngi541/ngi541/actions/workflows/ci.yml/badge.svg?branch=main&event=push">
   </a>
   <img alt="Project status" src="https://img.shields.io/badge/status-active%20development-2ea44f">
   <a href="LICENSE">
