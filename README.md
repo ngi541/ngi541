@@ -23,7 +23,7 @@
   <a href="LICENSE">
     <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   </a>
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.1.0-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.1.1-blue">
 </p>
 
 <p align="center">

@@ -199,10 +199,10 @@ ABI line            0.1
 The shared library therefore uses a compatibility identity corresponding to
 the `0.1` ABI line.
 
-On macOS, a release such as `0.1.0` produces versioned artifacts of the form:
+On macOS, a release such as `0.1.1` produces versioned artifacts of the form:
 
 ```text
-libngi541_engine.0.1.0.dylib
+libngi541_engine.0.1.1.dylib
 libngi541_engine.0.1.dylib
 libngi541_engine.dylib
 ```
@@ -417,13 +417,14 @@ If an exceptional patch-level compatibility break becomes unavoidable, it
 must be explicitly documented rather than hidden behind an unchanged
 compatibility claim.
 
-## 17. Planned 0.1.1 release relationship
+## 17. 0.1.1 release relationship
 
 The frozen `v0.1.0` tag represents the externally validated NGI541 baseline
 associated with NIST ACVTS Demo validation identifier A11030.
 
-The planned `0.1.1` release remains in the same `0.1` compatibility line and
-primarily adds public-readiness work such as:
+The `0.1.1` release remains in the same `0.1` compatibility line and
+primarily adds public-facing packaging, documentation, and integration
+improvements such as:
 
 - installable CMake packaging;
 - canonical public CMake targets;
@@ -433,7 +434,7 @@ primarily adds public-readiness work such as:
 - documentation;
 - release engineering improvements.
 
-The `0.1.1` release must not imply that its entire source tree is the exact
+The `0.1.1` release does not imply that its entire source tree is the exact
 artifact evaluated in the NIST ACVTS Demo workflow.
 
 Validation provenance is documented separately in

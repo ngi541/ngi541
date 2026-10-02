@@ -316,7 +316,7 @@ supported algorithm vectors passed
 Demo validation identifier A11030
 ```
 
-The public-ready 0.1.1 release line contains project-readiness, packaging,
+The NGI541 0.1.1 release contains project-readiness, packaging,
 documentation, provenance, and integration work performed after the frozen
 0.1.0 validation baseline.
 

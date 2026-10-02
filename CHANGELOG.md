@@ -10,6 +10,8 @@ See [`docs/ABI.md`](docs/ABI.md) for the compatibility policy.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-02
+
 This section contains changes intended for the first public-ready packaged
 release in the `0.1.x` line.
 
@@ -70,21 +72,6 @@ release in the `0.1.x` line.
 - Kept OpenSSL and `libacvp` outside the production dependency graph:
   - OpenSSL is used as a differential correctness oracle;
   - `libacvp` is used only by validation tooling.
-
-### Release preparation
-
-The planned public-ready release is `0.1.1`.
-
-Before release, this section should be converted into:
-
-```text
-## [0.1.1] - YYYY-MM-DD
-```
-
-and a new empty `## [Unreleased]` section should be created above it.
-
-The `v0.1.0` tag remains the frozen externally validated implementation
-baseline and must not be moved or recreated.
 
 ## [0.1.0] - 2026-09-30
 

@@ -158,17 +158,16 @@ identifier `A11030`.
 
 See [`validation.md`](validation.md) for the exact claim boundary.
 
-## 4. Current milestone: public-ready 0.1.1
+## 4. NGI541 0.1.1
 
-The current release objective is:
+NGI541 `0.1.1` establishes the first public-ready packaged release of the
+project.
 
-> NGI541 `0.1.1` — first public-ready packaged release.
+This release converts the validated standalone implementation into a project
+that an external engineer can understand, build, install, link, and evaluate
+without private project context.
 
-This release is intended to convert the validated standalone implementation
-into a project that an external engineer can understand, build, install, link,
-and evaluate without private project context.
-
-The current `0.1.1` readiness work includes:
+The `0.1.1` release includes:
 
 - complete public architecture documentation;
 - public validation documentation;
@@ -187,7 +186,7 @@ The current `0.1.1` readiness work includes:
 - external consumer validation;
 - canonical source-release engineering.
 
-The final `0.1.1` release should preserve the distinction between:
+The `0.1.1` release preserves the distinction between:
 
 ```text
 v0.1.0
@@ -202,8 +201,7 @@ artifact evaluated by NIST ACVTS Demo.
 
 ## 5. 0.1.1 release engineering
 
-Before the first public-ready release, NGI541 will establish a reproducible
-source-distribution process.
+NGI541 `0.1.1` uses a reproducible source-distribution process.
 
 The intended release chain is:
 
@@ -693,9 +691,9 @@ The current public roadmap can be summarized as:
 | Differential correctness | Complete |
 | Sanitizer hardening | Complete |
 | Installable package foundation | Complete |
-| Public documentation set | In progress |
-| `0.1.1` release engineering | Next |
-| Public repository / release launch | Planned |
+| Public documentation set | Complete |
+| `0.1.1` public-release foundation | Complete |
+| Canonical release publication  | Release process |
 | Benchmark Specification v1 | Planned |
 | Benchmark harness | Planned |
 | OpenSSL / IPsec-MB comparative campaign | Planned |
@@ -710,35 +708,30 @@ The current public roadmap can be summarized as:
 
 ## 22. Immediate next steps
 
-The immediate sequence before the first public-ready release is:
+With the `0.1.1` public-release foundation established, the next engineering
+sequence is:
 
 ```text
-complete public documentation
+Benchmark Specification v1
         |
         v
-complete CHANGELOG
+benchmark harness
         |
         v
-update README cross-links
+controlled local baseline
         |
         v
-update Documentation install component
+OpenSSL / IPsec-MB comparison
         |
         v
-align project version to 0.1.1
+broader Intel / AMD hardware campaign
         |
         v
-final release-content audit
-        |
-        v
-release-content freeze
-        |
-        v
-canonical 0.1.1 source release
+ARM64 enablement
 ```
 
-Performance architecture and comparative benchmarking follow after the
-`0.1.1` public release foundation is established.
+Performance architecture and regression infrastructure will evolve from this
+reproducible benchmark foundation.
 
 ## 23. Related documentation
 
