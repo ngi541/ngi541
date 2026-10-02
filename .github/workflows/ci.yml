@@ -2,31 +2,111 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
+
   pull_request:
+    branches:
+      - main
+
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   boundaries:
     name: Architecture boundaries
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    outputs:
+      code_changed: ${{ steps.changes.outputs.code_changed }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Show pinned submodules
+      - name: Classify changed files
+        id: changes
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: >-
+            ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: >-
+            ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          git submodule status --recursive
+          set -euo pipefail
+
+          # A manual run is always an explicit request for the complete
+          # verification matrix.
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+            echo "Manual run: full verification requested."
+            exit 0
+          fi
+
+          # Be conservative for unusual push events where GitHub does not
+          # provide a usable previous commit.
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
+            echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+            echo "No usable base SHA: running code verification."
+            exit 0
+          fi
+
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            git diff \
+              --name-only \
+              "${BASE_SHA}...${HEAD_SHA}" \
+              > changed-files.txt
+          else
+            git diff \
+              --name-only \
+              "${BASE_SHA}" \
+              "${HEAD_SHA}" \
+              > changed-files.txt
+          fi
+
+          echo "Changed files:"
+          cat changed-files.txt
+
+          code_changed=false
+
+          while IFS= read -r file; do
+            [[ -z "${file}" ]] && continue
+
+            # Documentation-only changes do not need compiler, sanitizer,
+            # ACVP, or platform matrices. Workflow/build/source changes are
+            # deliberately not listed here and therefore trigger full CI.
+            case "${file}" in
+              README.md|\
+              CHANGELOG.md|\
+              CONTRIBUTING.md|\
+              CODE_OF_CONDUCT.md|\
+              SECURITY.md|\
+              LICENSE|\
+              THIRD_PARTY_NOTICES.md|\
+              examples/README.md|\
+              docs/*|\
+              validation/evidence/*)
+                ;;
+              *)
+                code_changed=true
+                break
+                ;;
+            esac
+          done < changed-files.txt
+
+          echo "code_changed=${code_changed}" >> "${GITHUB_OUTPUT}"
+          echo "code_changed=${code_changed}"
 
       - name: Verify ACVP validation boundary
         shell: bash
@@ -181,15 +261,22 @@ jobs:
               sys.exit(1)
           PY
 
-  build-test:
-    name: Core / ${{ matrix.compiler }} / ${{ matrix.build_type }}
-    runs-on: ubuntu-24.04
+  # ---------------------------------------------------------------------------
+  # Post-merge verification
+  #
+  # Pull requests receive the exhaustive matrix below. A push to main therefore
+  # only needs a compact verification of the actual resulting main commit.
+  # ---------------------------------------------------------------------------
 
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [gcc, clang]
-        build_type: [Debug, Release]
+  main-smoke:
+    name: Main / Linux / Clang / Release
+    needs:
+      - boundaries
+    if: >-
+      github.event_name == 'push' &&
+      needs.boundaries.outputs.code_changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -202,10 +289,75 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            echo "CC=gcc" >> "$GITHUB_ENV"
+          echo "CC=clang" >> "${GITHUB_ENV}"
+          clang --version
+
+      - name: Configure
+        run: |
+          cmake \
+            -S . \
+            -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
+            -DNGI541_BUILD_ACVP=OFF
+
+      - name: Build
+        run: |
+          cmake \
+            --build build \
+            --parallel
+
+      - name: Test
+        run: |
+          ctest \
+            --test-dir build \
+            --output-on-failure \
+            --no-tests=error
+
+  # ---------------------------------------------------------------------------
+  # Exhaustive core matrix
+  #
+  # Runs for code-changing pull requests and explicit manual verification.
+  # Feature-branch pushes do not trigger a duplicate workflow.
+  # ---------------------------------------------------------------------------
+
+  build-test:
+    name: Core / Linux / ${{ matrix.compiler }} / ${{ matrix.build_type }}
+    needs:
+      - boundaries
+    if: >-
+      github.event_name != 'push' &&
+      needs.boundaries.outputs.code_changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: ${{ github.event_name != 'workflow_dispatch' }}
+      matrix:
+        compiler:
+          - gcc
+          - clang
+        build_type:
+          - Debug
+          - Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ matrix.compiler }}" == "gcc" ]]; then
+            echo "CC=gcc" >> "${GITHUB_ENV}"
           else
-            echo "CC=clang" >> "$GITHUB_ENV"
+            echo "CC=clang" >> "${GITHUB_ENV}"
           fi
 
       - name: Configure
@@ -225,7 +377,7 @@ jobs:
             --build build \
             --parallel
 
-      - name: Run public API conformance tests
+      - name: Run public API conformance gate
         run: |
           ctest \
             --test-dir build \
@@ -233,19 +385,26 @@ jobs:
             --output-on-failure \
             --no-tests=error
 
-      - name: Test
+      - name: Run remaining test suite
         run: |
           ctest \
             --test-dir build \
+            -E '^public\.(engine_not_initialized|api_validation)$' \
             --output-on-failure \
             --no-tests=error
 
   build-test-macos:
     name: Core / macOS / ${{ matrix.compiler }} / Debug
+    needs:
+      - boundaries
+    if: >-
+      github.event_name != 'push' &&
+      needs.boundaries.outputs.code_changed == 'true'
     runs-on: macos-15-intel
+    timeout-minutes: 30
 
     strategy:
-      fail-fast: false
+      fail-fast: ${{ github.event_name != 'workflow_dispatch' }}
       matrix:
         include:
           - compiler: apple-clang
@@ -265,8 +424,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "CC=${{ matrix.cc }}" >> "$GITHUB_ENV"
-
+          echo "CC=${{ matrix.cc }}" >> "${GITHUB_ENV}"
           "${{ matrix.cc }}" --version
 
       - name: Configure OpenSSL
@@ -278,7 +436,9 @@ jobs:
             HOMEBREW_NO_AUTO_UPDATE=1 brew install openssl@3
           fi
 
-          echo "CMAKE_PREFIX_PATH=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+          echo \
+            "CMAKE_PREFIX_PATH=$(brew --prefix openssl@3)" \
+            >> "${GITHUB_ENV}"
 
       - name: Configure
         run: |
@@ -297,7 +457,7 @@ jobs:
             --build build \
             --parallel
 
-      - name: Run differential correctness suite
+      - name: Run differential correctness gate
         run: |
           ctest \
             --test-dir build \
@@ -305,66 +465,63 @@ jobs:
             --output-on-failure \
             --no-tests=error
 
-      - name: Run full test suite
+      - name: Run remaining test suite
         run: |
           ctest \
             --test-dir build \
+            -E '^differential\.' \
             --output-on-failure \
             --no-tests=error
 
-  sanitizers:
-    name: Sanitizers / ${{ matrix.platform }} / ${{ matrix.compiler }} / ${{ matrix.profile }}
-    runs-on: ${{ matrix.runner }}
+  # ---------------------------------------------------------------------------
+  # Full Linux/Clang sanitizer evidence
+  #
+  # The previous workflow built Linux/Clang ASan, UBSan, and ASan+UBSan twice:
+  # once for smoke/instrumentation checks and again for full suites. These jobs
+  # combine instrumentation verification with the full suites, preserving the
+  # checks while eliminating the duplicate builds.
+  # ---------------------------------------------------------------------------
+
+  sanitizer-full:
+    name: Sanitizer full / Linux / Clang / ${{ matrix.profile }}
+    needs:
+      - boundaries
+    if: >-
+      github.event_name != 'push' &&
+      needs.boundaries.outputs.code_changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
 
     strategy:
-      fail-fast: false
-
+      fail-fast: ${{ github.event_name != 'workflow_dispatch' }}
       matrix:
         include:
-          - platform: Linux
-            runner: ubuntu-24.04
-            compiler: clang
-            cc: clang
-            bootstrap_compiler: clang
-            profile: ASan
+          - profile: ASan+LSan
+            artifact: asan-lsan
             asan: "ON"
             ubsan: "OFF"
+            require_lsan: true
+            asan_options: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1:detect_leaks=1"
+            ubsan_options: ""
+            lsan_options: "exitcode=23"
 
-          - platform: Linux
-            runner: ubuntu-24.04
-            compiler: clang
-            cc: clang
-            bootstrap_compiler: clang
-            profile: UBSan
+          - profile: UBSan
+            artifact: ubsan
             asan: "OFF"
             ubsan: "ON"
+            require_lsan: false
+            asan_options: ""
+            ubsan_options: "halt_on_error=1:print_stacktrace=1"
+            lsan_options: ""
 
-          - platform: Linux
-            runner: ubuntu-24.04
-            compiler: clang
-            cc: clang
-            bootstrap_compiler: clang
-            profile: ASan+UBSan
+          - profile: ASan+UBSan
+            artifact: asan-ubsan
             asan: "ON"
             ubsan: "ON"
-
-          - platform: Linux
-            runner: ubuntu-24.04
-            compiler: gcc
-            cc: gcc
-            bootstrap_compiler: gcc
-            profile: ASan+UBSan
-            asan: "ON"
-            ubsan: "ON"
-
-          - platform: macOS
-            runner: macos-15-intel
-            compiler: apple-clang
-            cc: /usr/bin/clang
-            bootstrap_compiler: clang
-            profile: ASan+UBSan
-            asan: "ON"
-            ubsan: "ON"
+            require_lsan: false
+            asan_options: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1"
+            ubsan_options: "halt_on_error=1:print_stacktrace=1"
+            lsan_options: ""
 
     steps:
       - name: Checkout
@@ -373,59 +530,57 @@ jobs:
           persist-credentials: false
 
       - name: Install Linux test dependencies
-        if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
 
-          sudo apt-get update
+          if ! dpkg-query \
+            -W \
+            -f='${Status}' \
+            libssl-dev \
+            2>/dev/null \
+            | grep -q 'ok installed'; then
+            sudo apt-get update
+            sudo apt-get install -y libssl-dev
+          fi
 
-          sudo apt-get install -y \
-            libssl-dev
-
-      - name: Prepare Linux sanitizer toolchain
-        if: runner.os == 'Linux'
+      - name: Prepare sanitizer toolchain
         shell: bash
         run: |
           set -euo pipefail
 
           ./scripts/bootstrap-sanitizer-deps.sh \
             --install \
-            --compiler "${{ matrix.bootstrap_compiler }}"
+            --compiler clang
 
-      - name: Verify macOS sanitizer toolchain
-        if: runner.os == 'macOS'
+      - name: Verify sanitizer toolchain
+        if: ${{ matrix.require_lsan == false }}
         shell: bash
         run: |
           set -euo pipefail
 
           ./scripts/bootstrap-sanitizer-deps.sh \
             --check \
-            --compiler "${{ matrix.bootstrap_compiler }}"
+            --compiler clang
+
+      - name: Require functional LeakSanitizer
+        if: ${{ matrix.require_lsan == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --check \
+            --compiler clang \
+            --require-lsan
 
       - name: Configure compiler
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "CC=${{ matrix.cc }}" >> "$GITHUB_ENV"
-
-          "${{ matrix.cc }}" --version
-
-      - name: Configure OpenSSL on macOS
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if ! brew list --versions openssl@3 >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 \
-              brew install openssl@3
-          fi
-
-          echo \
-            "CMAKE_PREFIX_PATH=$(brew --prefix openssl@3)" \
-            >> "$GITHUB_ENV"
+          echo "CC=clang" >> "${GITHUB_ENV}"
+          clang --version
 
       - name: Configure sanitizer build
         shell: bash
@@ -551,7 +706,260 @@ jobs:
               sys.exit(1)
           PY
 
-      - name: Run sanitizer infrastructure smoke tests
+      - name: Run buffer geometry regression gate
+        shell: bash
+        env:
+          ASAN_OPTIONS: ${{ matrix.asan_options }}
+          UBSAN_OPTIONS: ${{ matrix.ubsan_options }}
+          LSAN_OPTIONS: ${{ matrix.lsan_options }}
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-sanitizer \
+            -R '^robustness\.buffer_geometry$' \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Run remaining full sanitizer suite
+        shell: bash
+        env:
+          ASAN_OPTIONS: ${{ matrix.asan_options }}
+          UBSAN_OPTIONS: ${{ matrix.ubsan_options }}
+          LSAN_OPTIONS: ${{ matrix.lsan_options }}
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-sanitizer \
+            -E '^robustness\.buffer_geometry$' \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Upload sanitizer diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-full-${{ matrix.artifact }}
+          if-no-files-found: ignore
+          path: |
+            build-sanitizer/compile_commands.json
+            build-sanitizer/Testing/Temporary/LastTest.log
+            build-sanitizer/CMakeFiles/*.log
+
+  # ---------------------------------------------------------------------------
+  # Cross-toolchain/platform sanitizer compatibility
+  #
+  # Full sanitizer evidence is collected above on Linux/Clang. These two jobs
+  # preserve the previous GCC and macOS combined-sanitizer coverage as smoke
+  # and instrumentation checks.
+  # ---------------------------------------------------------------------------
+
+  sanitizer-compat:
+    name: Sanitizer compat / ${{ matrix.platform }} / ${{ matrix.compiler }}
+    needs:
+      - boundaries
+    if: >-
+      github.event_name != 'push' &&
+      needs.boundaries.outputs.code_changed == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: ${{ github.event_name != 'workflow_dispatch' }}
+      matrix:
+        include:
+          - platform: Linux
+            runner: ubuntu-24.04
+            compiler: gcc
+            cc: gcc
+            bootstrap_compiler: gcc
+
+          - platform: macOS
+            runner: macos-15-intel
+            compiler: apple-clang
+            cc: /usr/bin/clang
+            bootstrap_compiler: clang
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Linux test dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! dpkg-query \
+            -W \
+            -f='${Status}' \
+            libssl-dev \
+            2>/dev/null \
+            | grep -q 'ok installed'; then
+            sudo apt-get update
+            sudo apt-get install -y libssl-dev
+          fi
+
+      - name: Prepare Linux sanitizer toolchain
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --install \
+            --compiler "${{ matrix.bootstrap_compiler }}"
+
+      - name: Verify macOS sanitizer toolchain
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/bootstrap-sanitizer-deps.sh \
+            --check \
+            --compiler "${{ matrix.bootstrap_compiler }}"
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "CC=${{ matrix.cc }}" >> "${GITHUB_ENV}"
+          "${{ matrix.cc }}" --version
+
+      - name: Configure OpenSSL on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! brew list --versions openssl@3 >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install openssl@3
+          fi
+
+          echo \
+            "CMAKE_PREFIX_PATH=$(brew --prefix openssl@3)" \
+            >> "${GITHUB_ENV}"
+
+      - name: Configure sanitizer build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cmake \
+            -S . \
+            -B build-sanitizer \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
+            -DNGI541_BUILD_ACVP=OFF \
+            -DNGI541_ENABLE_ASAN=ON \
+            -DNGI541_ENABLE_UBSAN=ON
+
+      - name: Build sanitizer configuration
+        run: |
+          cmake \
+            --build build-sanitizer \
+            --parallel
+
+      - name: Verify production instrumentation
+        shell: bash
+        env:
+          EXPECT_ASAN: "ON"
+          EXPECT_UBSAN: "ON"
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          database_path = Path(
+              "build-sanitizer/compile_commands.json"
+          )
+
+          with database_path.open(
+              encoding="utf-8"
+          ) as file:
+              commands = json.load(file)
+
+          targets = (
+              "src/engine/native.c",
+              "src/engine/execute.c",
+              "src/engine/handlers/aes_cbc.c",
+              "src/engine/handlers/aes_ctr.c",
+              "src/engine/handlers/aes_gcm.c",
+              "src/engine/handlers/sha2.c",
+          )
+
+          expect_asan = (
+              os.environ["EXPECT_ASAN"] == "ON"
+          )
+
+          expect_ubsan = (
+              os.environ["EXPECT_UBSAN"] == "ON"
+          )
+
+          failed = False
+
+          for target in targets:
+              matches = [
+                  entry
+                  for entry in commands
+                  if entry["file"].endswith(target)
+              ]
+
+              if not matches:
+                  print(
+                      f"FAIL: missing compile command: "
+                      f"{target}"
+                  )
+                  failed = True
+                  continue
+
+              command = matches[0].get(
+                  "command",
+                  ""
+              )
+
+              required = [
+                  "-fno-omit-frame-pointer",
+                  "-fno-optimize-sibling-calls",
+                  "-fsanitize=address",
+                  "-fsanitize=undefined",
+                  "-fno-sanitize-recover=all",
+              ]
+
+              missing = [
+                  flag
+                  for flag in required
+                  if flag not in command
+              ]
+
+              if missing:
+                  print(
+                      f"FAIL: {target}: "
+                      f"missing {', '.join(missing)}"
+                  )
+                  failed = True
+              else:
+                  print(
+                      f"PASS: {target}"
+                  )
+
+          if failed:
+              sys.exit(1)
+          PY
+
+      - name: Run sanitizer compatibility smoke tests
         shell: bash
         env:
           ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1"
@@ -569,342 +977,34 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: sanitizer-${{ matrix.platform }}-${{ matrix.compiler }}-${{ matrix.profile }}
+          name: >-
+            sanitizer-compat-${{ matrix.platform }}-${{ matrix.compiler }}
           if-no-files-found: ignore
           path: |
             build-sanitizer/compile_commands.json
             build-sanitizer/Testing/Temporary/LastTest.log
             build-sanitizer/CMakeFiles/*.log
 
-  asan-lsan-full:
-    name: ASan+LSan / Linux / Clang / Full Suite
-    runs-on: ubuntu-24.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Install test dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          sudo apt-get update
-          sudo apt-get install -y \
-            libssl-dev
-
-      - name: Prepare sanitizer toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ./scripts/bootstrap-sanitizer-deps.sh \
-            --install \
-            --compiler clang
-
-      - name: Require functional LeakSanitizer
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ./scripts/bootstrap-sanitizer-deps.sh \
-            --check \
-            --compiler clang \
-            --require-lsan
-
-      - name: Configure compiler
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "CC=clang" >> "$GITHUB_ENV"
-          clang --version
-
-      - name: Configure ASan build
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cmake \
-            -S . \
-            -B build-asan \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DNGI541_BUILD_ENGINE=ON \
-            -DNGI541_BUILD_TESTS=ON \
-            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
-            -DNGI541_BUILD_ACVP=OFF \
-            -DNGI541_ENABLE_ASAN=ON \
-            -DNGI541_ENABLE_UBSAN=OFF
-
-      - name: Build
-        run: |
-          cmake \
-            --build build-asan \
-            --parallel
-
-      - name: Run ASan+LSan buffer geometry regression gate
-        shell: bash
-        env:
-          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1:detect_leaks=1"
-          LSAN_OPTIONS: "exitcode=23"
-        run: |
-          set -euo pipefail
-
-          ctest \
-            --test-dir build-asan \
-            -R '^robustness\.buffer_geometry$' \
-            --output-on-failure \
-            --no-tests=error
-
-      - name: Run full ASan+LSan test suite
-        shell: bash
-        env:
-          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1:detect_leaks=1"
-          LSAN_OPTIONS: "exitcode=23"
-        run: |
-          set -euo pipefail
-
-          ctest \
-            --test-dir build-asan \
-            --output-on-failure \
-            --no-tests=error
-
-      - name: Upload ASan diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: asan-lsan-full-diagnostics
-          if-no-files-found: ignore
-          path: |
-            build-asan/Testing/Temporary/LastTest.log
-            build-asan/CMakeFiles/*.log
-
-  ubsan-full:
-    name: UBSan / Linux / Clang / Full Suite
-    runs-on: ubuntu-24.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Install test dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          sudo apt-get update
-          sudo apt-get install -y \
-            libssl-dev
-
-      - name: Prepare sanitizer toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ./scripts/bootstrap-sanitizer-deps.sh \
-            --install \
-            --compiler clang
-
-      - name: Verify sanitizer toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ./scripts/bootstrap-sanitizer-deps.sh \
-            --check \
-            --compiler clang
-
-      - name: Configure compiler
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "CC=clang" >> "$GITHUB_ENV"
-          clang --version
-
-      - name: Configure UBSan build
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cmake \
-            -S . \
-            -B build-ubsan \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DNGI541_BUILD_ENGINE=ON \
-            -DNGI541_BUILD_TESTS=ON \
-            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
-            -DNGI541_BUILD_ACVP=OFF \
-            -DNGI541_ENABLE_ASAN=OFF \
-            -DNGI541_ENABLE_UBSAN=ON
-
-      - name: Build
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cmake \
-            --build build-ubsan \
-            --parallel
-
-      - name: Run UBSan buffer geometry regression gate
-        shell: bash
-        env:
-          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
-        run: |
-          set -euo pipefail
-
-          ctest \
-            --test-dir build-ubsan \
-            -R '^robustness\.buffer_geometry$' \
-            --output-on-failure \
-            --no-tests=error
-
-      - name: Run full UBSan test suite
-        shell: bash
-        env:
-          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
-        run: |
-          set -euo pipefail
-
-          ctest \
-            --test-dir build-ubsan \
-            --output-on-failure \
-            --no-tests=error
-
-      - name: Upload UBSan diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ubsan-full-diagnostics
-          if-no-files-found: ignore
-          path: |
-            build-ubsan/Testing/Temporary/LastTest.log
-            build-ubsan/compile_commands.json
-            build-ubsan/CMakeFiles/*.log
-
-  asan-ubsan-full:
-    name: ASan+UBSan / Linux / Clang / Full Suite
-    runs-on: ubuntu-24.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Install test dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          sudo apt-get update
-          sudo apt-get install -y \
-            libssl-dev
-
-      - name: Prepare sanitizer toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ./scripts/bootstrap-sanitizer-deps.sh \
-            --install \
-            --compiler clang
-
-      - name: Verify sanitizer toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ./scripts/bootstrap-sanitizer-deps.sh \
-            --check \
-            --compiler clang
-
-      - name: Configure compiler
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "CC=clang" >> "$GITHUB_ENV"
-          clang --version
-
-      - name: Configure ASan+UBSan build
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cmake \
-            -S . \
-            -B build-asan-ubsan \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DNGI541_BUILD_ENGINE=ON \
-            -DNGI541_BUILD_TESTS=ON \
-            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
-            -DNGI541_BUILD_ACVP=OFF \
-            -DNGI541_ENABLE_ASAN=ON \
-            -DNGI541_ENABLE_UBSAN=ON
-
-      - name: Build
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cmake \
-            --build build-asan-ubsan \
-            --parallel
-
-      - name: Run ASan+UBSan buffer geometry regression gate
-        shell: bash
-        env:
-          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1"
-          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
-        run: |
-          set -euo pipefail
-
-          ctest \
-            --test-dir build-asan-ubsan \
-            -R '^robustness\.buffer_geometry$' \
-            --output-on-failure \
-            --no-tests=error
-
-      - name: Run full ASan+UBSan test suite
-        shell: bash
-        env:
-          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_stack_use_after_return=1"
-          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
-        run: |
-          set -euo pipefail
-
-          ctest \
-            --test-dir build-asan-ubsan \
-            --output-on-failure \
-            --no-tests=error
-
-      - name: Upload ASan+UBSan diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: asan-ubsan-full-diagnostics
-          if-no-files-found: ignore
-          path: |
-            build-asan-ubsan/Testing/Temporary/LastTest.log
-            build-asan-ubsan/compile_commands.json
-            build-asan-ubsan/CMakeFiles/*.log
+  # ---------------------------------------------------------------------------
+  # ACVP validation
+  # ---------------------------------------------------------------------------
 
   acvp-validation:
     name: ACVP / ${{ matrix.compiler }} / Debug
+    needs:
+      - boundaries
+    if: >-
+      github.event_name != 'push' &&
+      needs.boundaries.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
 
     strategy:
-      fail-fast: false
+      fail-fast: ${{ github.event_name != 'workflow_dispatch' }}
       matrix:
-        compiler: [gcc, clang]
+        compiler:
+          - gcc
+          - clang
 
     steps:
       - name: Checkout
@@ -914,25 +1014,46 @@ jobs:
           persist-credentials: false
 
       - name: Install ACVP build dependencies
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            autoconf \
-            automake \
-            libtool \
-            pkg-config \
-            libssl-dev \
+          set -euo pipefail
+
+          packages=(
+            autoconf
+            automake
+            libtool
+            pkg-config
+            libssl-dev
             libcurl4-openssl-dev
+          )
+
+          missing=()
+
+          for package in "${packages[@]}"; do
+            if ! dpkg-query \
+              -W \
+              -f='${Status}' \
+              "${package}" \
+              2>/dev/null \
+              | grep -q 'ok installed'; then
+              missing+=("${package}")
+            fi
+          done
+
+          if (( ${#missing[@]} )); then
+            sudo apt-get update
+            sudo apt-get install -y "${missing[@]}"
+          fi
 
       - name: Configure compiler
         shell: bash
         run: |
           set -euo pipefail
 
-          if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            echo "CC=gcc" >> "$GITHUB_ENV"
+          if [[ "${{ matrix.compiler }}" == "gcc" ]]; then
+            echo "CC=gcc" >> "${GITHUB_ENV}"
           else
-            echo "CC=clang" >> "$GITHUB_ENV"
+            echo "CC=clang" >> "${GITHUB_ENV}"
           fi
 
       - name: Show libacvp revision
@@ -959,14 +1080,14 @@ jobs:
       - name: ACVP runner smoke test
         run: |
           ./build-acvp/validation/acvp/ngi541_acvp
-    
+
       - name: ACVP registration smoke test
         run: |
           ./build-acvp/validation/acvp/ngi541_acvp \
             --registration \
             > build-acvp/acvp-registration.json
 
-      - name: Run ACVP negative validation tests
+      - name: Run ACVP negative validation gate
         run: |
           ctest \
             --test-dir build-acvp \
@@ -974,10 +1095,11 @@ jobs:
             --output-on-failure \
             --no-tests=error
 
-      - name: Run full test suite
+      - name: Run remaining test suite
         run: |
           ctest \
             --test-dir build-acvp \
+            -E '^acvp\.(aes_gcm_callback_negative|aes_cbc_ctr_callback_negative|sha_callback_negative)$' \
             --output-on-failure \
             --no-tests=error
 
@@ -1000,15 +1122,23 @@ jobs:
             build-acvp/Testing/Temporary/LastTest.log
             build-acvp/tests/acvp/*_response.json
             build-acvp/acvp-registration.json
-            
+
   acvp-online-build:
     name: ACVP Online Build / ${{ matrix.compiler }} / Debug
+    needs:
+      - boundaries
+    if: >-
+      github.event_name != 'push' &&
+      needs.boundaries.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
 
     strategy:
-      fail-fast: false
+      fail-fast: ${{ github.event_name != 'workflow_dispatch' }}
       matrix:
-        compiler: [gcc, clang]
+        compiler:
+          - gcc
+          - clang
 
     steps:
       - name: Checkout
@@ -1018,14 +1148,35 @@ jobs:
           persist-credentials: false
 
       - name: Install ACVP build dependencies
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            autoconf \
-            automake \
-            libtool \
-            pkg-config \
+          set -euo pipefail
+
+          packages=(
+            autoconf
+            automake
+            libtool
+            pkg-config
             libssl-dev
+          )
+
+          missing=()
+
+          for package in "${packages[@]}"; do
+            if ! dpkg-query \
+              -W \
+              -f='${Status}' \
+              "${package}" \
+              2>/dev/null \
+              | grep -q 'ok installed'; then
+              missing+=("${package}")
+            fi
+          done
+
+          if (( ${#missing[@]} )); then
+            sudo apt-get update
+            sudo apt-get install -y "${missing[@]}"
+          fi
 
       - name: Bootstrap online ACVP dependencies
         run: |
@@ -1036,10 +1187,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            echo "CC=gcc" >> "$GITHUB_ENV"
+          if [[ "${{ matrix.compiler }}" == "gcc" ]]; then
+            echo "CC=gcc" >> "${GITHUB_ENV}"
           else
-            echo "CC=clang" >> "$GITHUB_ENV"
+            echo "CC=clang" >> "${GITHUB_ENV}"
           fi
 
       - name: Show pinned libacvp revision
