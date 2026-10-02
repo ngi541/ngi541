@@ -1,0 +1,13 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+
+Name: NGI541
+Description: @PROJECT_DESCRIPTION@
+URL: https://ngi541.org
+Version: @PROJECT_VERSION@
+
+Libs: -L${libdir} -lngi541_engine
+Libs.private: -lngi541_support
+Cflags: -I${includedir}

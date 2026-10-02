@@ -169,28 +169,150 @@ endif()
 # Installation and CMake package
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Installation and CMake package
+# ---------------------------------------------------------------------------
+
 if(NGI541_BUILD_ENGINE)
     set(
         NGI541_INSTALL_CMAKEDIR
         "${CMAKE_INSTALL_LIBDIR}/cmake/NGI541"
     )
 
+    set(
+        NGI541_THIRD_PARTY_NOTICES_FILE
+        "${PROJECT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
+    )
+
+    set(
+        NGI541_DOCUMENTATION_ROOT_FILES
+        "${PROJECT_SOURCE_DIR}/README.md"
+        "${PROJECT_SOURCE_DIR}/CHANGELOG.md"
+    )
+
+    set(
+        NGI541_DOCUMENTATION_TECHNICAL_FILES
+        "${PROJECT_SOURCE_DIR}/docs/architecture.md"
+        "${PROJECT_SOURCE_DIR}/docs/validation.md"
+        "${PROJECT_SOURCE_DIR}/docs/API.md"
+        "${PROJECT_SOURCE_DIR}/docs/ABI.md"
+        "${PROJECT_SOURCE_DIR}/docs/PLATFORMS.md"
+        "${PROJECT_SOURCE_DIR}/docs/performance.md"
+        "${PROJECT_SOURCE_DIR}/docs/roadmap.md"
+    )
+
+    set(
+        NGI541_DOCUMENTATION_LEGAL_FILES
+        "${PROJECT_SOURCE_DIR}/docs/legal/DEVELOPMENT_POLICY.md"
+        "${PROJECT_SOURCE_DIR}/docs/legal/PROVENANCE.md"
+    )
+
+    set(
+        NGI541_DOCUMENTATION_BRAND_FILES
+        "${PROJECT_SOURCE_DIR}/docs/assets/brand/README.md"
+        "${PROJECT_SOURCE_DIR}/docs/assets/brand/logo-dark.svg"
+        "${PROJECT_SOURCE_DIR}/docs/assets/brand/logo-light.svg"
+        "${PROJECT_SOURCE_DIR}/docs/assets/brand/mark-avatar.svg"
+        "${PROJECT_SOURCE_DIR}/docs/assets/brand/mark-dark.svg"
+        "${PROJECT_SOURCE_DIR}/docs/assets/brand/mark-light.svg"
+    )
+
+    set(
+        NGI541_DOCUMENTATION_EXAMPLE_FILES
+        "${PROJECT_SOURCE_DIR}/examples/README.md"
+        "${PROJECT_SOURCE_DIR}/examples/sha256.c"
+        "${PROJECT_SOURCE_DIR}/examples/aes_ctr.c"
+        "${PROJECT_SOURCE_DIR}/examples/aes_gcm.c"
+    )
+
+    set(
+        NGI541_REQUIRED_INSTALL_FILES
+        "${PROJECT_SOURCE_DIR}/LICENSE"
+        "${NGI541_THIRD_PARTY_NOTICES_FILE}"
+        ${NGI541_DOCUMENTATION_ROOT_FILES}
+        ${NGI541_DOCUMENTATION_TECHNICAL_FILES}
+        ${NGI541_DOCUMENTATION_LEGAL_FILES}
+        ${NGI541_DOCUMENTATION_BRAND_FILES}
+        ${NGI541_DOCUMENTATION_EXAMPLE_FILES}
+    )
+
+    foreach(
+        required_install_file
+        IN LISTS
+            NGI541_REQUIRED_INSTALL_FILES
+    )
+        if(NOT EXISTS "${required_install_file}")
+            message(
+                FATAL_ERROR
+                "Required installation file does not exist: "
+                "${required_install_file}"
+            )
+        endif()
+    endforeach()
+
+    if(UNIX)
+        set(
+            NGI541_INSTALL_PKGCONFIGDIR
+            "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+        )
+    endif()
+
+    # -----------------------------------------------------------------------
+    # Runtime component
+    # -----------------------------------------------------------------------
+
+    install(
+        TARGETS
+            ngi541_engine_shared
+        EXPORT
+            NGI541Targets
+        LIBRARY
+            DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            COMPONENT Runtime
+            NAMELINK_COMPONENT Development
+        RUNTIME
+            DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            COMPONENT Runtime
+        ARCHIVE
+            DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            COMPONENT Development
+    )
+
+    # Licensing material must accompany redistributable runtime artifacts.
+    install(
+        FILES
+            "${PROJECT_SOURCE_DIR}/LICENSE"
+            "${NGI541_THIRD_PARTY_NOTICES_FILE}"
+        DESTINATION
+            "${CMAKE_INSTALL_DOCDIR}"
+        COMPONENT
+            Runtime
+    )
+
+    # -----------------------------------------------------------------------
+    # Development component
+    # -----------------------------------------------------------------------
+
     install(
         TARGETS
             ngi541_engine
-            ngi541_engine_shared
             ngi541_support
-        EXPORT NGI541Targets
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        EXPORT
+            NGI541Targets
+        ARCHIVE
+            DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            COMPONENT Development
     )
 
+    # Internal interface targets do not install binary artifacts, but they
+    # must remain part of the exported target graph required by
+    # NGI541::engine.
     install(
         TARGETS
             ngi541_core
             ngi541_crypto_isa
-        EXPORT NGI541Targets
+        EXPORT
+            NGI541Targets
     )
 
     install(
@@ -198,9 +320,15 @@ if(NGI541_BUILD_ENGINE)
             "${PROJECT_SOURCE_DIR}/include/ngi541"
         DESTINATION
             "${CMAKE_INSTALL_INCLUDEDIR}"
+        COMPONENT
+            Development
         FILES_MATCHING
             PATTERN "*.h"
     )
+
+    # -----------------------------------------------------------------------
+    # CMake package metadata
+    # -----------------------------------------------------------------------
 
     configure_package_config_file(
         "${PROJECT_SOURCE_DIR}/cmake/NGI541Config.cmake.in"
@@ -217,11 +345,25 @@ if(NGI541_BUILD_ENGINE)
             SameMinorVersion
     )
 
+    if(UNIX)
+        configure_file(
+            "${PROJECT_SOURCE_DIR}/cmake/ngi541.pc.in"
+            "${PROJECT_BINARY_DIR}/ngi541.pc"
+            @ONLY
+        )
+    endif()
+
     install(
-        EXPORT NGI541Targets
-        FILE NGI541Targets.cmake
-        NAMESPACE NGI541::
-        DESTINATION "${NGI541_INSTALL_CMAKEDIR}"
+        EXPORT
+            NGI541Targets
+        FILE
+            NGI541Targets.cmake
+        NAMESPACE
+            NGI541::
+        DESTINATION
+            "${NGI541_INSTALL_CMAKEDIR}"
+        COMPONENT
+            Development
     )
 
     install(
@@ -230,5 +372,88 @@ if(NGI541_BUILD_ENGINE)
             "${PROJECT_BINARY_DIR}/NGI541ConfigVersion.cmake"
         DESTINATION
             "${NGI541_INSTALL_CMAKEDIR}"
+        COMPONENT
+            Development
+    )
+
+    if(UNIX)
+        install(
+            FILES
+                "${PROJECT_BINARY_DIR}/ngi541.pc"
+            DESTINATION
+                "${NGI541_INSTALL_PKGCONFIGDIR}"
+            COMPONENT
+                Development
+        )
+    endif()
+
+    # -----------------------------------------------------------------------
+    # Documentation component
+    # -----------------------------------------------------------------------
+
+    install(
+        FILES
+            ${NGI541_DOCUMENTATION_ROOT_FILES}
+        DESTINATION
+            "${CMAKE_INSTALL_DOCDIR}"
+        COMPONENT
+            Documentation
+    )
+
+    install(
+        FILES
+            ${NGI541_DOCUMENTATION_TECHNICAL_FILES}
+        DESTINATION
+            "${CMAKE_INSTALL_DOCDIR}/docs"
+        COMPONENT
+            Documentation
+    )
+
+    install(
+        FILES
+            ${NGI541_DOCUMENTATION_LEGAL_FILES}
+        DESTINATION
+            "${CMAKE_INSTALL_DOCDIR}/docs/legal"
+        COMPONENT
+            Documentation
+    )
+
+    install(
+        FILES
+            ${NGI541_DOCUMENTATION_BRAND_FILES}
+        DESTINATION
+            "${CMAKE_INSTALL_DOCDIR}/docs/assets/brand"
+        COMPONENT
+            Documentation
+    )
+
+    install(
+        FILES
+            ${NGI541_DOCUMENTATION_EXAMPLE_FILES}
+        DESTINATION
+            "${CMAKE_INSTALL_DOCDIR}/examples"
+        COMPONENT
+            Documentation
+    )
+
+    # -----------------------------------------------------------------------
+    # Uninstall target
+    # -----------------------------------------------------------------------
+
+    configure_file(
+        "${PROJECT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
+        "${PROJECT_BINARY_DIR}/cmake_uninstall.cmake"
+        @ONLY
+    )
+
+    add_custom_target(
+        uninstall
+        COMMAND
+            "${CMAKE_COMMAND}"
+            -P
+            "${PROJECT_BINARY_DIR}/cmake_uninstall.cmake"
+        COMMENT
+            "Uninstall NGI541 files recorded in install_manifest.txt"
+        VERBATIM
     )
 endif()

@@ -63,236 +63,129 @@ The project focuses on a deliberately small set of properties:
 
 NGI541 is not intended to be a general-purpose TLS, PKI, or cryptographic toolkit and is not positioned as a replacement for OpenSSL.
 
-## Current capabilities
+## Supported algorithms
 
-NGI541 0.1.0 currently exposes:
+The current `0.1.x` public execution surface is intentionally narrow:
 
-| Area | Support |
+| Algorithm | Support |
 | --- | --- |
-| AES-CBC | AES-128 / AES-192 / AES-256 |
-| AES-CTR | AES-128 / AES-192 / AES-256 |
-| AES-GCM | AES-128 / AES-192 / AES-256 |
+| AES-CBC | AES-128 / AES-192 / AES-256, encrypt and decrypt |
+| AES-CTR | AES-128 / AES-192 / AES-256, encrypt and decrypt |
+| AES-GCM | AES-128 / AES-192 / AES-256, authenticated encrypt and decrypt |
 | SHA-2 | SHA-224 / SHA-256 |
-| Public execution API | Yes |
-| Standalone native engine | Yes |
-| VPP runtime dependency | None |
-| Production OpenSSL dependency | None |
-| ACVP validation adapter | Yes |
-| Differential validation | OpenSSL EVP reference |
-| Sanitizer / memory-geometry testing | Yes |
-| NIST ACVTS Demo | `A11030` |
 
-The algorithm portfolio is intentionally narrow at this stage. The current priority is assurance, reproducibility, and execution architecture rather than expanding algorithm count.
+The production engine has no VPP runtime dependency and no OpenSSL dependency.
 
-## Architecture
+For the full API contract, see [`docs/API.md`](docs/API.md).
 
-At a high level:
+## Build and test
 
-```text
-                    Consumer
-                        │
-                        ▼
-                 NGI541 Public API
-                        │
-                        ▼
-                Execution Facade
-                        │
-                        ▼
-                  Native Provider
-                        │
-              ┌─────────┴─────────┐
-              ▼                   ▼
-             AES                SHA-2
-       CBC / CTR / GCM        224 / 256
-              │                   │
-              └─────────┬─────────┘
-                        ▼
-               SIMD / ISA primitives
-```
+NGI541 uses CMake and a C11-capable GCC, Clang, or AppleClang toolchain on supported platforms.
 
-Validation remains outside the production execution architecture:
-
-```text
-               NIST ACVTS / ACVP
-                        │
-                     libacvp
-                        │
-                 ACVP adapter
-                        │
-                        ▼
-                 NGI541 Public API
-                        │
-                        ▼
-                 production engine
-```
-
-The ACVP adapter is therefore a consumer of the same public API that is exposed to other NGI541 consumers. It does not bypass the public execution boundary through internal engine interfaces.
-
-## Verification and validation
-
-NGI541 follows an evidence-producing validation model:
-
-```text
-known-answer tests
-        ↓
-randomized differential verification
-        ↓
-memory / buffer-geometry testing
-        ↓
-ASan / UBSan validation
-        ↓
-ACVP semantic verification
-        ↓
-NIST-generated ACVTS vectors
-        ↓
-external server verdict
-```
-
-### NIST ACVTS Demo
-
-NGI541 0.1.0 completed a full non-sample validation session in the NIST ACVTS Demo environment.
-
-| Property | Value |
-| --- | --- |
-| Version | `0.1.0` |
-| Git tag | `v0.1.0` |
-| Baseline commit | `be5b8db305b557bbf079dc262e34532dacc00ade` |
-| Test session | `772630` |
-| Validation ID | `A11030` |
-| Environment | NIST ACVTS Demo |
-
-Validated vector sets:
-
-| Algorithm | Revision | Result |
-| --- | --- | --- |
-| ACVP-AES-CBC | 1.0 | passed |
-| ACVP-AES-CTR | 1.0 | passed |
-| ACVP-AES-GCM | 1.0 | passed |
-| SHA2-224 | 1.0 | passed |
-| SHA2-256 | 1.0 | passed |
-
-Sanitized validation evidence is available under:
-
-[`validation/evidence/acvts-demo/`](validation/evidence/acvts-demo/)
-
-The evidence pack intentionally excludes credentials, JWTs, TOTP material, private keys, raw ACVTS vectors, and other sensitive validation state.
-
-## Performance
-
-NGI541 is currently described as **performance-oriented**, not as faster than any specific cryptographic implementation.
-
-A reproducible performance methodology and benchmark harness are being developed before comparative performance claims are made.
-
-The planned evaluation focuses on:
-
-- packet-sized workloads;
-- single-operation execution;
-- future batch / multi-operation execution;
-- cycles per byte;
-- throughput;
-- operations per second;
-- latency per operation;
-- CPU/core efficiency;
-- cache and memory behavior;
-- reproducible comparisons with established cryptographic implementations.
-
-Performance claims published by the project will be accompanied by sufficient environment and methodology metadata to allow independent reproduction.
-
-## Building
-
-NGI541 uses CMake and requires a C11-capable GCC or Clang toolchain.
-
-Basic build:
+A recommended source build keeps the regular test suite enabled:
 
 ```bash
-cmake -S . -B build \
-  -DNGI541_BUILD_ENGINE=ON
-
-cmake --build build
-```
-
-Run the test suite:
-
-```bash
-ctest --test-dir build --output-on-failure
-```
-
-The ACVP validation layer and differential-reference tests are optional and are disabled independently from the production engine.
-
-### ACVP build
-
-```bash
-cmake -S . -B build-acvp \
-  -DNGI541_BUILD_ENGINE=ON \
-  -DNGI541_BUILD_ACVP=ON
-
-cmake --build build-acvp
-```
-
-Additional bootstrap scripts are available under [`scripts/`](scripts/) for validation and test dependencies.
-
-## Installation
-
-NGI541 provides installable public headers, static and shared libraries, and a
-CMake package for external consumers.
-
-### Build and install
-
-Configure a release build with the engine enabled:
-
-```bash
-cmake -S . -B build \
+cmake \
+  -S . \
+  -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DNGI541_BUILD_ENGINE=ON \
-  -DNGI541_BUILD_TESTS=OFF \
-  -DNGI541_BUILD_EXAMPLES=OFF
-```
-
-Build and install:
-
-```bash
-cmake --build build --parallel
-cmake --install build
-```
-
-To install into a custom prefix:
-
-```bash
-cmake -S . -B build \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DNGI541_BUILD_ENGINE=ON \
-  -DNGI541_BUILD_TESTS=OFF \
+  -DNGI541_BUILD_TESTS=ON \
   -DNGI541_BUILD_EXAMPLES=OFF \
+  -DNGI541_BUILD_ACVP=OFF
+
+cmake \
+  --build build \
+  --parallel
+
+ctest \
+  --test-dir build \
+  --output-on-failure
+```
+
+Validation-specific dependencies such as OpenSSL and `libacvp` are not required for a normal production-engine build.
+
+ACVP and validation workflows are documented in [`docs/validation.md`](docs/validation.md) and [`validation/acvp/README.md`](validation/acvp/README.md).
+
+## Install
+
+Install only after the configured test suite passes:
+
+```bash
+cmake \
+  --install build
+```
+
+NGI541 follows CMake's normal installation-prefix model and `GNUInstallDirs`. The project does not hardcode a package-manager-specific installation path.
+
+For a custom prefix, set it when configuring the build:
+
+```bash
+cmake \
+  -S . \
+  -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DNGI541_BUILD_ENGINE=ON \
+  -DNGI541_BUILD_TESTS=ON \
+  -DNGI541_BUILD_EXAMPLES=OFF \
+  -DNGI541_BUILD_ACVP=OFF \
   -DCMAKE_INSTALL_PREFIX="$HOME/.local"
 
-cmake --build build --parallel
-cmake --install build
+cmake \
+  --build build \
+  --parallel
+
+ctest \
+  --test-dir build \
+  --output-on-failure
+
+cmake \
+  --install build
 ```
 
-The installation contains:
+Setting `CMAKE_INSTALL_PREFIX` at configure time is recommended for custom-prefix installs because the generated `pkg-config` metadata records the configured prefix. The installed CMake package remains relocatable.
 
-```text
-include/ngi541/
-├── api.h
-├── crypto.h
-└── engine.h
+### Installation components
 
-lib/
-├── libngi541_engine.*
-├── libngi541_support.*
-└── cmake/NGI541/
-    ├── NGI541Config.cmake
-    ├── NGI541ConfigVersion.cmake
-    └── NGI541Targets*.cmake
+The installation is divided into three components:
+
+| Component | Contents |
+| --- | --- |
+| `Runtime` | Versioned shared library and required redistribution notices |
+| `Development` | Public headers, static library, shared-library linker name, CMake package metadata, and `pkg-config` metadata |
+| `Documentation` | Project documentation and public example sources |
+
+A component can be installed independently:
+
+```bash
+cmake --install build --component Runtime
+cmake --install build --component Development
+cmake --install build --component Documentation
 ```
 
-`libngi541_support` and the internal exported CMake targets are implementation
-details required by the installed package. Applications should link only to the
-public NGI541 targets described below.
+`DESTDIR` staging is supported for package construction.
 
-### Using NGI541 from CMake
+### Uninstall
 
-An external CMake project can consume an installed NGI541 package with:
+The build tree provides a manifest-based uninstall target:
+
+```bash
+cmake \
+  --build build \
+  --target uninstall
+```
+
+The uninstall step removes only files recorded in CMake's installation manifest. Empty installation directories are intentionally left in place.
+
+## Use from CMake
+
+The canonical installed static-library target is:
+
+```cmake
+NGI541::engine
+```
+
+A minimal consumer project can use:
 
 ```cmake
 cmake_minimum_required(VERSION 3.20)
@@ -300,33 +193,39 @@ cmake_minimum_required(VERSION 3.20)
 project(my_app LANGUAGES C)
 
 find_package(
-    NGI541
-    CONFIG
-    REQUIRED
+  NGI541
+  CONFIG
+  REQUIRED
 )
 
 add_executable(
-    my_app
-    main.c
+  my_app
+  main.c
 )
 
 target_link_libraries(
-    my_app
-    PRIVATE
-        NGI541::engine
+  my_app
+  PRIVATE
+    NGI541::engine
 )
 ```
 
-`NGI541::engine` is the canonical installed target for the static NGI541
-execution engine.
-
-A shared-library target is also available:
+The shared-library target is:
 
 ```cmake
 NGI541::engine_shared
 ```
 
-Applications should not depend directly on the package's internal targets:
+If NGI541 is installed under a non-standard prefix, configure the consumer with that prefix:
+
+```bash
+cmake \
+  -S . \
+  -B build \
+  -DCMAKE_PREFIX_PATH="$HOME/.local"
+```
+
+Applications must not depend directly on internal package targets such as:
 
 ```text
 NGI541::_core
@@ -334,173 +233,75 @@ NGI541::_support
 NGI541::_crypto_isa
 ```
 
-Those targets are exported only to preserve the transitive implementation
-dependencies of the public package.
+See [`docs/API.md`](docs/API.md) and [`docs/ABI.md`](docs/ABI.md) for the public API and compatibility contracts.
 
-### Finding a custom installation
+## Use with pkg-config
 
-If NGI541 is installed into a non-standard prefix, provide that prefix when
-configuring the consumer:
-
-```bash
-cmake -S . -B build \
-  -DCMAKE_PREFIX_PATH="$HOME/.local"
-```
-
-Then build normally:
-
-```bash
-cmake --build build --parallel
-```
-
-### Public headers
-
-Consumers use the installed public API through:
-
-```c
-#include <ngi541/engine.h>
-```
-
-`engine.h` includes the public cryptographic API required for normal engine
-usage. Applications may also include the lower-level public headers directly
-when appropriate:
-
-```c
-#include <ngi541/api.h>
-#include <ngi541/crypto.h>
-```
-
-Cryptographic operations require explicit engine initialization:
-
-```c
-ngi541_status_t status = ngi541_engine_init ();
-```
-
-NGI541 `0.1.x` does not currently expose a public shutdown/deinitialization
-function.
-
-### Minimal consumer example
-
-```c
-#include <ngi541/engine.h>
-
-#include <stdint.h>
-#include <stdio.h>
-
-int
-main (void)
-{
-  static const uint8_t message[] = {
-    'N', 'G', 'I', '5', '4', '1'
-  };
-
-  uint8_t digest[32] = { 0 };
-
-  ngi541_hash_request_t request = {
-    .struct_size = sizeof (request),
-    .algorithm = NGI541_HASH_SHA2_256,
-    .message = message,
-    .message_len = sizeof (message),
-    .digest = digest,
-    .digest_capacity = sizeof (digest),
-  };
-
-  ngi541_status_t status = ngi541_engine_init ();
-
-  if (status != NGI541_STATUS_OK)
-    return 1;
-
-  status = ngi541_crypto_hash_compute (&request);
-
-  if (status != NGI541_STATUS_OK)
-    return 2;
-
-  for (size_t i = 0; i < sizeof (digest); i++)
-    printf ("%02x", digest[i]);
-
-  putchar ('\n');
-
-  return 0;
-}
-```
-
-For more complete public API usage examples, see
-[`examples/`](examples/).
-
-### ABI compatibility
-
-NGI541 is currently in the `0.x` development series.
-
-Patch releases within the same minor release line are treated as compatible by
-the installed CMake package. Compatibility is not guaranteed across minor
-release lines.
-
-For example:
+Supported Unix-like installations also provide:
 
 ```text
-0.1.0 -> 0.1.1   same compatibility line
-0.1.x -> 0.2.x   compatibility not guaranteed
+ngi541.pc
 ```
+
+Compiler and linker flags can be obtained with:
+
+```bash
+pkg-config --cflags --libs ngi541
+```
+
+For static linking:
+
+```bash
+pkg-config --static --cflags --libs ngi541
+```
+
+The CMake package is the canonical cross-platform consumer interface.
 
 ## Examples
 
-Minimal examples using only the public NGI541 API are available in
-[`examples/`](examples/).
-
-They demonstrate:
+Public API examples are available under [`examples/`](examples/):
 
 - SHA-256 hashing;
 - AES-128-CTR encryption and decryption;
 - AES-128-GCM authenticated encryption and decryption.
 
-Build NGI541 with the examples enabled:
+Build them with:
 
 ```bash
-cmake -S . -B build \
+cmake \
+  -S . \
+  -B build-examples \
+  -DCMAKE_BUILD_TYPE=Release \
   -DNGI541_BUILD_ENGINE=ON \
-  -DNGI541_BUILD_EXAMPLES=ON
+  -DNGI541_BUILD_EXAMPLES=ON \
+  -DNGI541_BUILD_TESTS=OFF \
+  -DNGI541_BUILD_ACVP=OFF
 
-cmake --build build
+cmake \
+  --build build-examples \
+  --parallel
 ```
 
-Run them:
-
-```bash
-./build/examples/ngi541_example_sha256
-./build/examples/ngi541_example_aes_ctr
-./build/examples/ngi541_example_aes_gcm
-```
-
-The examples use only the public NGI541 API and link against the NGI541::engine CMake target.
-
-See [`examples/README.md`](examples/README.md) for API usage and security notes.
-
-## Project status
-
-NGI541 is under active development.
-
-Version `0.1.0` represents the first externally validated standalone baseline. The public API boundary has been established, but the project has **not** declared a long-term stable ABI.
-
-Current development is focused on:
-
-1. public-project readiness and documentation;
-2. reproducible performance methodology;
-3. standalone benchmark infrastructure;
-4. multi-platform performance characterization;
-5. performance-oriented execution architecture development.
-
-Future versions may change public interfaces while the project remains in the `0.x` development series.
+The examples use only the public NGI541 API. See [`examples/README.md`](examples/README.md) for usage and security notes.
 
 ## Documentation
 
-Current project documentation includes:
+Detailed project documentation is intentionally kept outside the README so that this file remains the project entry point rather than a duplicate reference manual.
 
-- [Source provenance](docs/legal/PROVENANCE.md)
-- [Development policy](docs/legal/DEVELOPMENT_POLICY.md)
-- [ACVP validation adapter](validation/acvp/README.md)
-- [NIST ACVTS Demo evidence](validation/evidence/acvts-demo/README.md)
-
-Additional architecture, validation, performance, and roadmap documentation will be published as the public project structure is completed.
+| Topic | Document |
+| --- | --- |
+| Architecture and production boundaries | [`docs/architecture.md`](docs/architecture.md) |
+| Validation model and ACVTS evidence | [`docs/validation.md`](docs/validation.md) |
+| Public API | [`docs/API.md`](docs/API.md) |
+| ABI and versioning policy | [`docs/ABI.md`](docs/ABI.md) |
+| Supported platforms and ISA policy | [`docs/PLATFORMS.md`](docs/PLATFORMS.md) |
+| Performance methodology and claim policy | [`docs/performance.md`](docs/performance.md) |
+| Project roadmap | [`docs/roadmap.md`](docs/roadmap.md) |
+| Changelog | [`CHANGELOG.md`](CHANGELOG.md) |
+| Source provenance | [`docs/legal/PROVENANCE.md`](docs/legal/PROVENANCE.md) |
+| Development policy | [`docs/legal/DEVELOPMENT_POLICY.md`](docs/legal/DEVELOPMENT_POLICY.md) |
+| ACVP adapter | [`validation/acvp/README.md`](validation/acvp/README.md) |
+| NIST ACVTS Demo evidence | [`validation/evidence/acvts-demo/README.md`](validation/evidence/acvts-demo/README.md) |
 
 ## Contributing
 
@@ -508,7 +309,7 @@ NGI541 welcomes technically rigorous contributions consistent with the project's
 
 Contributions require Developer Certificate of Origin sign-off.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Security
 
@@ -516,7 +317,7 @@ NGI541 has not undergone an independent security audit and must not currently be
 
 Do not report suspected security vulnerabilities through public GitHub issues.
 
-See [SECURITY.md](SECURITY.md) for the current reporting policy.
+See [`SECURITY.md`](SECURITY.md) for the current reporting policy.
 
 ## License and provenance
 
@@ -526,9 +327,9 @@ Portions of the cryptographic implementation are derived from publicly available
 
 See:
 
-- [LICENSE](LICENSE)
-- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-- [docs/legal/PROVENANCE.md](docs/legal/PROVENANCE.md)
+- [`LICENSE`](LICENSE)
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+- [`docs/legal/PROVENANCE.md`](docs/legal/PROVENANCE.md)
 
 NGI541 is developed as an independent open-source project and does not require the FD.io VPP runtime.
 

@@ -1,0 +1,111 @@
+set(
+    _ngi541_install_manifest
+    "@PROJECT_BINARY_DIR@/install_manifest.txt"
+)
+
+if(NOT EXISTS "${_ngi541_install_manifest}")
+    message(
+        FATAL_ERROR
+        "Cannot find install manifest: ${_ngi541_install_manifest}\n"
+        "Run 'cmake --install' before using the uninstall target."
+    )
+endif()
+
+file(
+    STRINGS
+    "${_ngi541_install_manifest}"
+    _ngi541_installed_files
+)
+
+if(NOT _ngi541_installed_files)
+    message(
+        STATUS
+        "NGI541 install manifest is empty; nothing to uninstall."
+    )
+    return()
+endif()
+
+list(REVERSE _ngi541_installed_files)
+
+foreach(_ngi541_installed_file IN LISTS _ngi541_installed_files)
+    if(_ngi541_installed_file STREQUAL "")
+        continue()
+    endif()
+
+    if(NOT IS_ABSOLUTE "${_ngi541_installed_file}")
+        message(
+            FATAL_ERROR
+            "Refusing to remove non-absolute manifest entry: "
+            "${_ngi541_installed_file}"
+        )
+    endif()
+
+    set(
+        _ngi541_file_to_remove
+        "${_ngi541_installed_file}"
+    )
+
+    if(
+        DEFINED ENV{DESTDIR}
+        AND
+        NOT "$ENV{DESTDIR}" STREQUAL ""
+    )
+        string(
+            FIND
+            "${_ngi541_installed_file}"
+            "$ENV{DESTDIR}"
+            _ngi541_destdir_position
+        )
+
+        if(NOT _ngi541_destdir_position EQUAL 0)
+            set(
+                _ngi541_file_to_remove
+                "$ENV{DESTDIR}${_ngi541_installed_file}"
+            )
+        endif()
+    endif()
+
+    if(
+        EXISTS "${_ngi541_file_to_remove}"
+        OR
+        IS_SYMLINK "${_ngi541_file_to_remove}"
+    )
+        message(
+            STATUS
+            "Removing ${_ngi541_file_to_remove}"
+        )
+
+        execute_process(
+            COMMAND
+                "@CMAKE_COMMAND@"
+                -E
+                rm
+                -f
+                "${_ngi541_file_to_remove}"
+            RESULT_VARIABLE
+                _ngi541_remove_result
+        )
+
+        if(NOT _ngi541_remove_result EQUAL 0)
+            message(
+                FATAL_ERROR
+                "Failed to remove: ${_ngi541_file_to_remove}"
+            )
+        endif()
+    else()
+        message(
+            STATUS
+            "Already absent: ${_ngi541_file_to_remove}"
+        )
+    endif()
+endforeach()
+
+message(
+    STATUS
+    "NGI541 uninstall completed."
+)
+
+message(
+    STATUS
+    "Empty installation directories are intentionally left in place."
+)
