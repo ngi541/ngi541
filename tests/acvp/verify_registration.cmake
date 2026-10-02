@@ -448,12 +448,10 @@ assert_numeric_array(
     128
 )
 
-assert_domain(
+assert_numeric_array(
     ${gcm_index}
     ivLen
     96
-    96
-    8
 )
 
 assert_domain(
