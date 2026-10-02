@@ -262,61 +262,6 @@ jobs:
           PY
 
   # ---------------------------------------------------------------------------
-  # Post-merge verification
-  #
-  # Pull requests receive the exhaustive matrix below. A push to main therefore
-  # only needs a compact verification of the actual resulting main commit.
-  # ---------------------------------------------------------------------------
-
-  main-smoke:
-    name: Main / Linux / Clang / Release
-    needs:
-      - boundaries
-    if: >-
-      github.event_name == 'push' &&
-      needs.boundaries.outputs.code_changed == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Configure compiler
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "CC=clang" >> "${GITHUB_ENV}"
-          clang --version
-
-      - name: Configure
-        run: |
-          cmake \
-            -S . \
-            -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DNGI541_BUILD_ENGINE=ON \
-            -DNGI541_BUILD_TESTS=ON \
-            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
-            -DNGI541_BUILD_ACVP=OFF
-
-      - name: Build
-        run: |
-          cmake \
-            --build build \
-            --parallel
-
-      - name: Test
-        run: |
-          ctest \
-            --test-dir build \
-            --output-on-failure \
-            --no-tests=error
-
-  # ---------------------------------------------------------------------------
   # Exhaustive core matrix
   #
   # Runs for code-changing pull requests and explicit manual verification.
@@ -327,9 +272,7 @@ jobs:
     name: Core / Linux / ${{ matrix.compiler }} / ${{ matrix.build_type }}
     needs:
       - boundaries
-    if: >-
-      github.event_name != 'push' &&
-      needs.boundaries.outputs.code_changed == 'true'
+    if: needs.boundaries.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -397,9 +340,7 @@ jobs:
     name: Core / macOS / ${{ matrix.compiler }} / Debug
     needs:
       - boundaries
-    if: >-
-      github.event_name != 'push' &&
-      needs.boundaries.outputs.code_changed == 'true'
+    if: needs.boundaries.outputs.code_changed == 'true'
     runs-on: macos-15-intel
     timeout-minutes: 30
 
@@ -486,9 +427,7 @@ jobs:
     name: Sanitizer full / Linux / Clang / ${{ matrix.profile }}
     needs:
       - boundaries
-    if: >-
-      github.event_name != 'push' &&
-      needs.boundaries.outputs.code_changed == 'true'
+    if: needs.boundaries.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
 
@@ -759,9 +698,7 @@ jobs:
     name: Sanitizer compat / ${{ matrix.platform }} / ${{ matrix.compiler }}
     needs:
       - boundaries
-    if: >-
-      github.event_name != 'push' &&
-      needs.boundaries.outputs.code_changed == 'true'
+    if: needs.boundaries.outputs.code_changed == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
 
@@ -993,9 +930,7 @@ jobs:
     name: ACVP / ${{ matrix.compiler }} / Debug
     needs:
       - boundaries
-    if: >-
-      github.event_name != 'push' &&
-      needs.boundaries.outputs.code_changed == 'true'
+    if: needs.boundaries.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -1127,9 +1062,7 @@ jobs:
     name: ACVP Online Build / ${{ matrix.compiler }} / Debug
     needs:
       - boundaries
-    if: >-
-      github.event_name != 'push' &&
-      needs.boundaries.outputs.code_changed == 'true'
+    if: needs.boundaries.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
