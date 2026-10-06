@@ -222,7 +222,24 @@ if(NGI541_BUILD_ENGINE)
         NAME public.prepared_concurrency
         COMMAND ngi541_prepared_concurrency_test
     )
+
+    add_executable(
+        ngi541_prepared_validation_test
     
+        public/prepared_validation.c
+    )
+    
+    target_link_libraries(
+        ngi541_prepared_validation_test
+        PRIVATE
+            NGI541::engine
+    )
+    
+    add_test(
+        NAME public.prepared_validation
+        COMMAND ngi541_prepared_validation_test
+    )
+
 endif()
 
 if(NGI541_BUILD_DIFFERENTIAL_TESTS)

@@ -8,6 +8,7 @@
 
 #include <ngi541/api.h>
 #include <ngi541/crypto.h>
+#include <ngi541/prepared.h>
 
 NGI541_BEGIN_DECLS
 

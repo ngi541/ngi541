@@ -13,6 +13,7 @@
 
 #include "engine/internal/execute.h"
 #include "engine/internal/native.h"
+#include "support/compat/memory.h"
 
 typedef enum
 {
@@ -27,6 +28,36 @@ typedef struct
   ngi541_crypto_alg_t alg_id;
   ngi541_crypto_op_id_t op_id;
 } ngi541_keyed_execution_plan_t;
+
+#define NGI541_CIPHER_KEY_MAGIC 0x434b3534u
+#define NGI541_AEAD_KEY_MAGIC   0x414b3534u
+
+struct ngi541_cipher_key
+{
+  uint32_t magic;
+
+  ngi541_cipher_algorithm_t algorithm;
+  size_t key_len;
+
+  ngi541_crypto_alg_t alg_id;
+
+  size_t key_data_size;
+  void *key_data;
+};
+
+
+struct ngi541_aead_key
+{
+  uint32_t magic;
+
+  ngi541_aead_algorithm_t algorithm;
+  size_t key_len;
+
+  ngi541_crypto_alg_t alg_id;
+
+  size_t key_data_size;
+  void *key_data;
+};
 
 static atomic_int ngi541_engine_state =
   ATOMIC_VAR_INIT (NGI541_ENGINE_STATE_UNINITIALIZED);
@@ -337,6 +368,104 @@ ngi541_release_key_data (
   ngi541_secure_zero (
     key_data,
     key_data_size);
+}
+
+static ngi541_status_t
+ngi541_create_persistent_key_data (
+  ngi541_crypto_alg_t alg_id,
+  const uint8_t *key,
+  size_t key_len,
+  void **prepared_data,
+  size_t *prepared_size)
+{
+  void *key_data;
+  size_t key_data_size;
+  size_t actual_size;
+  ngi541_status_t status;
+
+  if (prepared_data == NULL ||
+      prepared_size == NULL)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  *prepared_data = NULL;
+  *prepared_size = 0;
+
+  if (alg_id <= NGI541_CRYPTO_ALG_NONE ||
+      alg_id >= NGI541_CRYPTO_N_ALGS)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  if (ngi541_engine_provider->key_handler == NULL)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  key_data_size =
+    ngi541_engine_provider->key_data_size[alg_id];
+
+  if (key_data_size == 0)
+    return NGI541_STATUS_UNAVAILABLE;
+
+  key_data =
+    ngi541_aligned_alloc (
+      key_data_size,
+      NGI541_EXEC_KEY_DATA_ALIGNMENT);
+
+  if (key_data == NULL)
+    return NGI541_STATUS_NO_MEMORY;
+
+  status = ngi541_prepare_key_data (
+    alg_id,
+    key,
+    key_len,
+    key_data,
+    key_data_size,
+    &actual_size);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      ngi541_secure_zero (
+        key_data,
+        key_data_size);
+
+      ngi541_aligned_free (
+        key_data);
+
+      return status;
+    }
+
+  if (actual_size != key_data_size)
+    {
+      ngi541_release_key_data (
+        alg_id,
+        key_data,
+        actual_size);
+
+      ngi541_aligned_free (
+        key_data);
+
+      return NGI541_STATUS_INTERNAL_ERROR;
+    }
+
+  *prepared_data = key_data;
+  *prepared_size = key_data_size;
+
+  return NGI541_STATUS_OK;
+}
+
+static void
+ngi541_destroy_persistent_key_data (
+  ngi541_crypto_alg_t alg_id,
+  void *key_data,
+  size_t key_data_size)
+{
+  if (key_data == NULL)
+    return;
+
+  ngi541_release_key_data (
+    alg_id,
+    key_data,
+    key_data_size);
+
+  ngi541_aligned_free (
+    key_data);
 }
 
 
@@ -769,6 +898,639 @@ ngi541_execute_cipher (
     false);
 }
 
+NGI541_API ngi541_status_t
+ngi541_crypto_cipher_key_create (
+  const ngi541_cipher_key_params_t *params,
+  ngi541_cipher_key_t **prepared_key)
+{
+  ngi541_keyed_execution_plan_t plan;
+  ngi541_cipher_key_t *key;
+  ngi541_status_t status;
+
+  status = ngi541_engine_ready_status ();
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  if (prepared_key == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  *prepared_key = NULL;
+
+  if (params == NULL ||
+      params->struct_size < sizeof (*params))
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (params->key == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  status = ngi541_map_cipher (
+    params->algorithm,
+    params->key_len,
+    false,
+    &plan);
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  key =
+    ngi541_aligned_alloc (
+      sizeof (*key),
+      NGI541_EXEC_KEY_DATA_ALIGNMENT);
+
+  if (key == NULL)
+    return NGI541_STATUS_NO_MEMORY;
+
+  memset (
+    key,
+    0,
+    sizeof (*key));
+
+  status = ngi541_create_persistent_key_data (
+    plan.alg_id,
+    params->key,
+    params->key_len,
+    &key->key_data,
+    &key->key_data_size);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      ngi541_secure_zero (
+        key,
+        sizeof (*key));
+
+      ngi541_aligned_free (
+        key);
+
+      return status;
+    }
+
+  key->magic = NGI541_CIPHER_KEY_MAGIC;
+  key->algorithm = params->algorithm;
+  key->key_len = params->key_len;
+  key->alg_id = plan.alg_id;
+
+  *prepared_key = key;
+
+  return NGI541_STATUS_OK;
+}
+
+NGI541_API void
+ngi541_crypto_cipher_key_destroy (
+  ngi541_cipher_key_t *prepared_key)
+{
+  if (prepared_key == NULL)
+    return;
+
+  if (prepared_key->magic !=
+      NGI541_CIPHER_KEY_MAGIC)
+    return;
+
+  prepared_key->magic = 0;
+
+  ngi541_destroy_persistent_key_data (
+    prepared_key->alg_id,
+    prepared_key->key_data,
+    prepared_key->key_data_size);
+
+  ngi541_secure_zero (
+    prepared_key,
+    sizeof (*prepared_key));
+
+  ngi541_aligned_free (
+    prepared_key);
+}
+
+NGI541_API ngi541_status_t
+ngi541_crypto_aead_key_create (
+  const ngi541_aead_key_params_t *params,
+  ngi541_aead_key_t **prepared_key)
+{
+  ngi541_keyed_execution_plan_t plan;
+  ngi541_aead_key_t *key;
+  ngi541_status_t status;
+
+  status = ngi541_engine_ready_status ();
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  if (prepared_key == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  *prepared_key = NULL;
+
+  if (params == NULL ||
+      params->struct_size < sizeof (*params))
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (params->key == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (params->algorithm !=
+      NGI541_AEAD_AES_GCM)
+    return NGI541_STATUS_UNSUPPORTED;
+
+  status = ngi541_map_gcm (
+    params->key_len,
+    0,
+    false,
+    &plan);
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  key =
+    ngi541_aligned_alloc (
+      sizeof (*key),
+      NGI541_EXEC_KEY_DATA_ALIGNMENT);
+
+  if (key == NULL)
+    return NGI541_STATUS_NO_MEMORY;
+
+  memset (
+    key,
+    0,
+    sizeof (*key));
+
+  status = ngi541_create_persistent_key_data (
+    plan.alg_id,
+    params->key,
+    params->key_len,
+    &key->key_data,
+    &key->key_data_size);
+
+  if (status != NGI541_STATUS_OK)
+    {
+      ngi541_secure_zero (
+        key,
+        sizeof (*key));
+
+      ngi541_aligned_free (
+        key);
+
+      return status;
+    }
+
+  key->magic = NGI541_AEAD_KEY_MAGIC;
+  key->algorithm = params->algorithm;
+  key->key_len = params->key_len;
+  key->alg_id = plan.alg_id;
+
+  *prepared_key = key;
+
+  return NGI541_STATUS_OK;
+}
+
+NGI541_API void
+ngi541_crypto_aead_key_destroy (
+  ngi541_aead_key_t *prepared_key)
+{
+  if (prepared_key == NULL)
+    return;
+
+  if (prepared_key->magic !=
+      NGI541_AEAD_KEY_MAGIC)
+    return;
+
+  prepared_key->magic = 0;
+
+  ngi541_destroy_persistent_key_data (
+    prepared_key->alg_id,
+    prepared_key->key_data,
+    prepared_key->key_data_size);
+
+  ngi541_secure_zero (
+    prepared_key,
+    sizeof (*prepared_key));
+
+  ngi541_aligned_free (
+    prepared_key);
+}
+
+static ngi541_status_t
+ngi541_execute_cipher_prepared (
+  const ngi541_cipher_key_t *prepared_key,
+  const ngi541_cipher_exec_request_t *request,
+  bool decrypt)
+{
+  ngi541_keyed_execution_plan_t plan;
+  ngi541_op_workspace_t workspace;
+  const ngi541_provider_op_handler_t *handler;
+  ngi541_status_t status;
+
+  memset (&workspace, 0, sizeof (workspace));
+
+  status = ngi541_engine_ready_status ();
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  if (prepared_key == NULL ||
+      prepared_key->magic != NGI541_CIPHER_KEY_MAGIC)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (prepared_key->key_data == NULL ||
+      prepared_key->key_data_size == 0)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  if (request == NULL ||
+      request->struct_size < sizeof (*request))
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->iv == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->input_len != 0 &&
+      request->input == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->output_capacity <
+      request->input_len)
+    return NGI541_STATUS_BUFFER_TOO_SMALL;
+
+  if (request->input_len != 0 &&
+      request->output == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->input_len > UINT32_MAX)
+    return NGI541_STATUS_UNSUPPORTED;
+
+  status = ngi541_map_cipher (
+    prepared_key->algorithm,
+    prepared_key->key_len,
+    decrypt,
+    &plan);
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  /*
+   * A valid prepared key must always map back to the same
+   * internal algorithm that was selected at creation time.
+   */
+  if (plan.alg_id != prepared_key->alg_id)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  if (request->iv_len != 16)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (prepared_key->algorithm ==
+        NGI541_CIPHER_AES_CBC &&
+      (request->input_len % 16) != 0)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  /*
+   * Preserve the existing AES-CTR aliasing contract:
+   * exact in-place operation is supported, partial overlap is not.
+   */
+  if (prepared_key->algorithm ==
+        NGI541_CIPHER_AES_CTR &&
+      ngi541_ranges_partially_overlap (
+        request->input,
+        request->output,
+        request->input_len))
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  ngi541_prepare_operation (
+    &workspace,
+    plan.op_id);
+
+  memcpy (
+    workspace.iv_scratch,
+    request->iv,
+    16);
+
+  workspace.op.src =
+    request->input != NULL
+      ? (u8 *) request->input
+      : workspace.empty;
+
+  workspace.op.dst =
+    request->output != NULL
+      ? request->output
+      : workspace.empty;
+
+  workspace.op.iv =
+    workspace.iv_scratch;
+
+  workspace.op.len =
+    (u32) request->input_len;
+
+  handler =
+    ngi541_get_simple_handler (
+      plan.op_id);
+
+  if (handler == NULL)
+    return NGI541_STATUS_UNAVAILABLE;
+
+  return ngi541_execute_prepared_key (
+    &workspace,
+    handler,
+    prepared_key->key_data,
+    false);
+}
+
+
+NGI541_API ngi541_status_t
+ngi541_crypto_cipher_encrypt_prepared (
+  const ngi541_cipher_key_t *prepared_key,
+  const ngi541_cipher_exec_request_t *request)
+{
+  return ngi541_execute_cipher_prepared (
+    prepared_key,
+    request,
+    false);
+}
+
+
+NGI541_API ngi541_status_t
+ngi541_crypto_cipher_decrypt_prepared (
+  const ngi541_cipher_key_t *prepared_key,
+  const ngi541_cipher_exec_request_t *request)
+{
+  return ngi541_execute_cipher_prepared (
+    prepared_key,
+    request,
+    true);
+}
+
+NGI541_API ngi541_status_t
+ngi541_crypto_aead_encrypt_prepared (
+  const ngi541_aead_key_t *prepared_key,
+  const ngi541_aead_encrypt_exec_request_t *request)
+{
+  ngi541_keyed_execution_plan_t plan;
+  ngi541_op_workspace_t workspace;
+  const ngi541_provider_op_handler_t *handler;
+  ngi541_status_t status;
+
+  memset (&workspace, 0, sizeof (workspace));
+
+  status = ngi541_engine_ready_status ();
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  if (prepared_key == NULL ||
+      prepared_key->magic != NGI541_AEAD_KEY_MAGIC)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (prepared_key->key_data == NULL ||
+      prepared_key->key_data_size == 0)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  if (request == NULL ||
+      request->struct_size < sizeof (*request))
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->iv == NULL ||
+      request->tag == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->aad_len != 0 &&
+      request->aad == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->plaintext_len != 0 &&
+      request->plaintext == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->ciphertext_capacity <
+      request->plaintext_len)
+    return NGI541_STATUS_BUFFER_TOO_SMALL;
+
+  if (request->plaintext_len != 0 &&
+      request->ciphertext == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (prepared_key->algorithm !=
+      NGI541_AEAD_AES_GCM)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  if (request->iv_len != 12 ||
+      request->tag_len != 16)
+    return NGI541_STATUS_UNSUPPORTED;
+
+  if (request->plaintext_len > UINT32_MAX ||
+      request->aad_len > UINT16_MAX)
+    return NGI541_STATUS_UNSUPPORTED;
+
+  status = ngi541_map_gcm (
+    prepared_key->key_len,
+    request->aad_len,
+    false,
+    &plan);
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  if (plan.alg_id != prepared_key->alg_id)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  ngi541_prepare_operation (
+    &workspace,
+    plan.op_id);
+
+  memcpy (
+    workspace.iv_scratch,
+    request->iv,
+    12);
+
+  workspace.op.src =
+    request->plaintext != NULL
+      ? (u8 *) request->plaintext
+      : workspace.empty;
+
+  workspace.op.dst =
+    request->ciphertext != NULL
+      ? request->ciphertext
+      : workspace.empty;
+
+  workspace.op.iv =
+    workspace.iv_scratch;
+
+  workspace.op.aad =
+    request->aad != NULL
+      ? (u8 *) request->aad
+      : workspace.empty;
+
+  workspace.op.tag =
+    request->tag;
+
+  workspace.op.len =
+    (u32) request->plaintext_len;
+
+  workspace.op.aad_len =
+    (u16) request->aad_len;
+
+  workspace.op.tag_len =
+    (u8) request->tag_len;
+
+  handler =
+    ngi541_get_simple_handler (
+      plan.op_id);
+
+  if (handler == NULL)
+    return NGI541_STATUS_UNAVAILABLE;
+
+  return ngi541_execute_prepared_key (
+    &workspace,
+    handler,
+    prepared_key->key_data,
+    false);
+}
+
+NGI541_API ngi541_status_t
+ngi541_crypto_aead_decrypt_prepared (
+  const ngi541_aead_key_t *prepared_key,
+  const ngi541_aead_decrypt_exec_request_t *request)
+{
+  ngi541_keyed_execution_plan_t plan;
+  ngi541_op_workspace_t workspace;
+  const ngi541_provider_op_handler_t *handler;
+  ngi541_status_t status;
+
+  memset (&workspace, 0, sizeof (workspace));
+
+  status = ngi541_engine_ready_status ();
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  if (prepared_key == NULL ||
+      prepared_key->magic != NGI541_AEAD_KEY_MAGIC)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (prepared_key->key_data == NULL ||
+      prepared_key->key_data_size == 0)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  if (request == NULL ||
+      request->struct_size < sizeof (*request))
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->iv == NULL ||
+      request->tag == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->aad_len != 0 &&
+      request->aad == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->ciphertext_len != 0 &&
+      request->ciphertext == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (request->plaintext_capacity <
+      request->ciphertext_len)
+    return NGI541_STATUS_BUFFER_TOO_SMALL;
+
+  if (request->ciphertext_len != 0 &&
+      request->plaintext == NULL)
+    return NGI541_STATUS_INVALID_ARGUMENT;
+
+  if (prepared_key->algorithm !=
+      NGI541_AEAD_AES_GCM)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  if (request->iv_len != 12 ||
+      request->tag_len != 16)
+    return NGI541_STATUS_UNSUPPORTED;
+
+  if (request->ciphertext_len > UINT32_MAX ||
+      request->aad_len > UINT16_MAX)
+    return NGI541_STATUS_UNSUPPORTED;
+
+  status = ngi541_map_gcm (
+    prepared_key->key_len,
+    request->aad_len,
+    true,
+    &plan);
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  if (plan.alg_id != prepared_key->alg_id)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  ngi541_prepare_operation (
+    &workspace,
+    plan.op_id);
+
+  memcpy (
+    workspace.iv_scratch,
+    request->iv,
+    12);
+
+  /*
+   * Decrypt receives a caller-owned const tag. Preserve the
+   * existing one-shot behavior and use mutable scratch storage
+   * for the internal operation ABI.
+   */
+  memcpy (
+    workspace.tag_scratch,
+    request->tag,
+    16);
+
+  workspace.op.src =
+    request->ciphertext != NULL
+      ? (u8 *) request->ciphertext
+      : workspace.empty;
+
+  workspace.op.dst =
+    request->plaintext != NULL
+      ? request->plaintext
+      : workspace.empty;
+
+  workspace.op.iv =
+    workspace.iv_scratch;
+
+  workspace.op.aad =
+    request->aad != NULL
+      ? (u8 *) request->aad
+      : workspace.empty;
+
+  workspace.op.tag =
+    workspace.tag_scratch;
+
+  workspace.op.len =
+    (u32) request->ciphertext_len;
+
+  workspace.op.aad_len =
+    (u16) request->aad_len;
+
+  workspace.op.tag_len =
+    (u8) request->tag_len;
+
+  handler =
+    ngi541_get_simple_handler (
+      plan.op_id);
+
+  if (handler == NULL)
+    return NGI541_STATUS_UNAVAILABLE;
+
+  status = ngi541_execute_prepared_key (
+    &workspace,
+    handler,
+    prepared_key->key_data,
+    true);
+
+  /*
+   * Preserve the existing public API guarantee: unauthenticated
+   * plaintext must never be left visible to the caller.
+   */
+  if (status == NGI541_STATUS_AUTH_FAILED &&
+      request->plaintext != NULL &&
+      request->ciphertext_len != 0)
+    {
+      ngi541_secure_zero (
+        request->plaintext,
+        request->ciphertext_len);
+    }
+
+  return status;
+}
 
 NGI541_API ngi541_status_t
 ngi541_crypto_cipher_encrypt (

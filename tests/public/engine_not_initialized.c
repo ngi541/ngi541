@@ -65,6 +65,55 @@ main (void)
       "ngi541_crypto_hash_compute(NULL)",
       ngi541_crypto_hash_compute (NULL));
 
+  /*
+   * Prepared-key API follows the same explicit initialization
+   * contract as the existing one-shot public API.
+   *
+   * Engine state is checked before argument validation.
+   */
+
+  failed |=
+    expect_not_initialized (
+      "ngi541_crypto_cipher_key_create(NULL, NULL)",
+      ngi541_crypto_cipher_key_create (
+        NULL,
+        NULL));
+
+  failed |=
+    expect_not_initialized (
+      "ngi541_crypto_aead_key_create(NULL, NULL)",
+      ngi541_crypto_aead_key_create (
+        NULL,
+        NULL));
+
+  failed |=
+    expect_not_initialized (
+      "ngi541_crypto_cipher_encrypt_prepared(NULL, NULL)",
+      ngi541_crypto_cipher_encrypt_prepared (
+        NULL,
+        NULL));
+
+  failed |=
+    expect_not_initialized (
+      "ngi541_crypto_cipher_decrypt_prepared(NULL, NULL)",
+      ngi541_crypto_cipher_decrypt_prepared (
+        NULL,
+        NULL));
+
+  failed |=
+    expect_not_initialized (
+      "ngi541_crypto_aead_encrypt_prepared(NULL, NULL)",
+      ngi541_crypto_aead_encrypt_prepared (
+        NULL,
+        NULL));
+
+  failed |=
+    expect_not_initialized (
+      "ngi541_crypto_aead_decrypt_prepared(NULL, NULL)",
+      ngi541_crypto_aead_decrypt_prepared (
+        NULL,
+        NULL));
+
   if (failed)
     return 1;
 

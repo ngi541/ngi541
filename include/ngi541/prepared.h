@@ -152,6 +152,65 @@ typedef struct
   size_t plaintext_capacity;
 } ngi541_aead_decrypt_exec_request_t;
 
+/*
+ * Create an immutable prepared cipher key.
+ *
+ * Raw key material is consumed synchronously and is not retained.
+ * On success, *prepared_key receives an engine-owned object.
+ */
+NGI541_API ngi541_status_t
+ngi541_crypto_cipher_key_create (
+  const ngi541_cipher_key_params_t *params,
+  ngi541_cipher_key_t **prepared_key);
+
+NGI541_API void
+ngi541_crypto_cipher_key_destroy (
+  ngi541_cipher_key_t *prepared_key);
+
+
+/*
+ * Create an immutable prepared AEAD key.
+ */
+NGI541_API ngi541_status_t
+ngi541_crypto_aead_key_create (
+  const ngi541_aead_key_params_t *params,
+  ngi541_aead_key_t **prepared_key);
+
+NGI541_API void
+ngi541_crypto_aead_key_destroy (
+  ngi541_aead_key_t *prepared_key);
+
+
+/*
+ * Execute using an already prepared cipher key.
+ *
+ * No key expansion or memory allocation is performed by this call.
+ */
+NGI541_API ngi541_status_t
+ngi541_crypto_cipher_encrypt_prepared (
+  const ngi541_cipher_key_t *prepared_key,
+  const ngi541_cipher_exec_request_t *request);
+
+NGI541_API ngi541_status_t
+ngi541_crypto_cipher_decrypt_prepared (
+  const ngi541_cipher_key_t *prepared_key,
+  const ngi541_cipher_exec_request_t *request);
+
+
+/*
+ * Execute using an already prepared AEAD key.
+ *
+ * No key expansion or memory allocation is performed by these calls.
+ */
+NGI541_API ngi541_status_t
+ngi541_crypto_aead_encrypt_prepared (
+  const ngi541_aead_key_t *prepared_key,
+  const ngi541_aead_encrypt_exec_request_t *request);
+
+NGI541_API ngi541_status_t
+ngi541_crypto_aead_decrypt_prepared (
+  const ngi541_aead_key_t *prepared_key,
+  const ngi541_aead_decrypt_exec_request_t *request);
 
 NGI541_END_DECLS
 
