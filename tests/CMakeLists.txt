@@ -182,6 +182,47 @@ if(NGI541_BUILD_ENGINE)
     if(NGI541_BUILD_ACVP)
         add_subdirectory(acvp)
     endif()
+
+    add_executable(
+        ngi541_prepared_runtime_test
+    
+        public/prepared_runtime.c
+    )
+    
+    target_link_libraries(
+        ngi541_prepared_runtime_test
+        PRIVATE
+            NGI541::engine
+    )
+    
+    add_test(
+        NAME public.prepared_runtime
+        COMMAND ngi541_prepared_runtime_test
+    )
+
+    find_package(
+        Threads
+        REQUIRED
+    )
+
+    add_executable(
+        ngi541_prepared_concurrency_test
+    
+        public/prepared_concurrency.c
+    )
+    
+    target_link_libraries(
+        ngi541_prepared_concurrency_test
+        PRIVATE
+            NGI541::engine
+            Threads::Threads
+    )
+    
+    add_test(
+        NAME public.prepared_concurrency
+        COMMAND ngi541_prepared_concurrency_test
+    )
+    
 endif()
 
 if(NGI541_BUILD_DIFFERENTIAL_TESTS)
