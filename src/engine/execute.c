@@ -211,28 +211,28 @@ ngi541_execute_unkeyed (
 
 
 static ngi541_status_t
-ngi541_execute_keyed (
-  ngi541_keyed_workspace_t *workspace,
+ngi541_prepare_key_data (
   ngi541_crypto_alg_t alg_id,
   const uint8_t *key,
   size_t key_len,
-  bool allow_auth_failure)
+  void *key_data,
+  size_t key_data_capacity,
+  size_t *prepared_size)
 {
-  const ngi541_provider_op_handler_t *handler;
   ngi541_crypto_key_handler_args_t key_args;
   size_t key_data_size;
-  u32 completed;
-  ngi541_status_t status;
 
   if (alg_id <= NGI541_CRYPTO_ALG_NONE ||
       alg_id >= NGI541_CRYPTO_N_ALGS)
     return NGI541_STATUS_INTERNAL_ERROR;
 
-  handler =
-    ngi541_get_simple_handler (workspace->operation.op.op);
+  if (key == NULL ||
+      key_data == NULL ||
+      prepared_size == NULL)
+    return NGI541_STATUS_INTERNAL_ERROR;
 
-  if (handler == NULL)
-    return NGI541_STATUS_UNAVAILABLE;
+  if (key_len > UINT16_MAX)
+    return NGI541_STATUS_INTERNAL_ERROR;
 
   if (ngi541_engine_provider->key_handler == NULL)
     return NGI541_STATUS_INTERNAL_ERROR;
@@ -243,47 +243,149 @@ ngi541_execute_keyed (
   if (key_data_size == 0)
     return NGI541_STATUS_UNAVAILABLE;
 
-  if (key_data_size > NGI541_EXEC_KEY_DATA_CAPACITY)
+  if (key_data_size > key_data_capacity)
     return NGI541_STATUS_INTERNAL_ERROR;
 
   memset (
-    workspace->key_data,
+    key_data,
     0,
     key_data_size);
 
   key_args = (ngi541_crypto_key_handler_args_t) {
     .alg = alg_id,
-    .key_data = workspace->key_data,
+    .key_data = key_data,
     .key = key,
     .key_length = (u16) key_len,
   };
-
-  workspace->operation.op.key_data =
-    workspace->key_data;
 
   ngi541_engine_provider->key_handler (
     NGI541_CRYPTO_KEY_OP_ADD,
     key_args);
 
-  completed = handler->fn (
-    workspace->operation.ops,
-    1);
+  *prepared_size = key_data_size;
 
-  status = ngi541_translate_handler_result (
-    &workspace->operation.op,
-    completed,
-    allow_auth_failure);
+  return NGI541_STATUS_OK;
+}
+
+
+static ngi541_status_t
+ngi541_execute_prepared_key (
+  ngi541_op_workspace_t *workspace,
+  const ngi541_provider_op_handler_t *handler,
+  void *key_data,
+  bool allow_auth_failure)
+{
+  u32 completed;
+
+  if (workspace == NULL ||
+      handler == NULL ||
+      key_data == NULL)
+    return NGI541_STATUS_INTERNAL_ERROR;
 
   /*
-   * Provider-specific cleanup is performed first. The execution
-   * facade then unconditionally scrubs the complete expanded-key
-   * region used by this provider.
+   * key_data contains provider-specific prepared key material.
+   *
+   * Execution must not modify or destroy this material. The internal
+   * operation ABI is currently not const-qualified, so the immutable
+   * prepared-key contract is enforced by the execution design rather
+   * than by the type system at this stage.
    */
+  workspace->op.key_data =
+    key_data;
+
+  completed = handler->fn (
+    workspace->ops,
+    1);
+
+  return ngi541_translate_handler_result (
+    &workspace->op,
+    completed,
+    allow_auth_failure);
+}
+
+
+static void
+ngi541_release_key_data (
+  ngi541_crypto_alg_t alg_id,
+  void *key_data,
+  size_t key_data_size)
+{
+  ngi541_crypto_key_handler_args_t key_args;
+
+  if (key_data == NULL ||
+      key_data_size == 0)
+    return;
+
+  /*
+   * Raw key material is intentionally not required for deletion.
+   *
+   * A prepared-key object retains only provider-specific prepared
+   * state. This invariant is required by the persistent-key API:
+   * destruction must not depend on retaining the caller's raw key.
+   */
+  key_args = (ngi541_crypto_key_handler_args_t) {
+    .alg = alg_id,
+    .key_data = key_data,
+    .key = NULL,
+    .key_length = 0,
+  };
+
   ngi541_engine_provider->key_handler (
     NGI541_CRYPTO_KEY_OP_DEL,
     key_args);
 
   ngi541_secure_zero (
+    key_data,
+    key_data_size);
+}
+
+
+static ngi541_status_t
+ngi541_execute_keyed (
+  ngi541_keyed_workspace_t *workspace,
+  ngi541_crypto_alg_t alg_id,
+  const uint8_t *key,
+  size_t key_len,
+  bool allow_auth_failure)
+{
+  const ngi541_provider_op_handler_t *handler;
+  size_t key_data_size;
+  ngi541_status_t status;
+
+  if (alg_id <= NGI541_CRYPTO_ALG_NONE ||
+      alg_id >= NGI541_CRYPTO_N_ALGS)
+    return NGI541_STATUS_INTERNAL_ERROR;
+
+  /*
+   * Preserve the existing one-shot ordering: reject an unavailable
+   * operation handler before performing key preparation.
+   */
+  handler =
+    ngi541_get_simple_handler (
+      workspace->operation.op.op);
+
+  if (handler == NULL)
+    return NGI541_STATUS_UNAVAILABLE;
+
+  status = ngi541_prepare_key_data (
+    alg_id,
+    key,
+    key_len,
+    workspace->key_data,
+    sizeof (workspace->key_data),
+    &key_data_size);
+
+  if (status != NGI541_STATUS_OK)
+    return status;
+
+  status = ngi541_execute_prepared_key (
+    &workspace->operation,
+    handler,
+    workspace->key_data,
+    allow_auth_failure);
+
+  ngi541_release_key_data (
+    alg_id,
     workspace->key_data,
     key_data_size);
 
