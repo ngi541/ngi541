@@ -1,5 +1,7 @@
 add_library(
     ngi541_support STATIC
+
+    compat/memory.c
     compat/string.c
 )
 

@@ -44,6 +44,12 @@ enum
 
   NGI541_STATUS_NOT_INITIALIZED = 6,
   NGI541_STATUS_INTERNAL_ERROR = 7,
+
+  /*
+   * Memory required to create or retain engine-owned state
+   * could not be allocated.
+   */
+  NGI541_STATUS_NO_MEMORY = 8,
 };
 
 
