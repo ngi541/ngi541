@@ -324,7 +324,7 @@ jobs:
         run: |
           ctest \
             --test-dir build \
-            -R '^public\.(engine_not_initialized|api_validation)$' \
+            -R '^public\.(engine_not_initialized|api_validation|prepared_validation)$' \
             --output-on-failure \
             --no-tests=error
 
@@ -332,7 +332,7 @@ jobs:
         run: |
           ctest \
             --test-dir build \
-            -E '^public\.(engine_not_initialized|api_validation)$' \
+            -E '^public\.(engine_not_initialized|api_validation|prepared_validation)$' \
             --output-on-failure \
             --no-tests=error
 
@@ -544,7 +544,7 @@ jobs:
             --build build-sanitizer \
             --parallel
 
-      - name: Verify production instrumentation
+      - name: Verify sanitizer instrumentation
         shell: bash
         env:
           EXPECT_ASAN: ${{ matrix.asan }}
@@ -568,12 +568,16 @@ jobs:
               commands = json.load(file)
 
           targets = (
+              "src/support/compat/memory.c",
               "src/engine/native.c",
               "src/engine/execute.c",
               "src/engine/handlers/aes_cbc.c",
               "src/engine/handlers/aes_ctr.c",
               "src/engine/handlers/aes_gcm.c",
               "src/engine/handlers/sha2.c",
+              "tests/public/prepared_runtime.c",
+              "tests/public/prepared_validation.c",
+              "tests/public/prepared_concurrency.c",
           )
 
           expect_asan = (
@@ -829,6 +833,7 @@ jobs:
               commands = json.load(file)
 
           targets = (
+              "src/support/compat/memory.c",
               "src/engine/native.c",
               "src/engine/execute.c",
               "src/engine/handlers/aes_cbc.c",
@@ -921,6 +926,154 @@ jobs:
             build-sanitizer/compile_commands.json
             build-sanitizer/Testing/Temporary/LastTest.log
             build-sanitizer/CMakeFiles/*.log
+
+  thread-sanitizer:
+    name: TSan / Linux / Clang
+    needs:
+      - boundaries
+    if: needs.boundaries.outputs.code_changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            libssl-dev
+
+      - name: Configure compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "CC=clang" >> "${GITHUB_ENV}"
+          clang --version
+
+      - name: Configure TSan build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cmake \
+            -S . \
+            -B build-tsan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DNGI541_BUILD_ENGINE=ON \
+            -DNGI541_BUILD_TESTS=ON \
+            -DNGI541_BUILD_DIFFERENTIAL_TESTS=ON \
+            -DNGI541_BUILD_ACVP=OFF \
+            -DNGI541_ENABLE_ASAN=OFF \
+            -DNGI541_ENABLE_UBSAN=OFF \
+            -DCMAKE_C_FLAGS="-O1 -g -fsanitize=thread -fno-omit-frame-pointer -fno-optimize-sibling-calls" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=thread"
+
+      - name: Build TSan configuration
+        run: |
+          cmake \
+            --build build-tsan \
+            --parallel
+
+      - name: Verify TSan instrumentation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          commands = json.loads(
+              Path(
+                  "build-tsan/compile_commands.json"
+              ).read_text()
+          )
+
+          targets = (
+              "src/support/compat/memory.c",
+              "src/engine/execute.c",
+              "src/engine/native.c",
+              "src/engine/handlers/aes_ctr.c",
+              "src/engine/handlers/aes_gcm.c",
+              "tests/public/prepared_concurrency.c",
+          )
+
+          failed = False
+
+          for target in targets:
+              matches = [
+                  entry
+                  for entry in commands
+                  if entry["file"].endswith(target)
+              ]
+
+              if not matches:
+                  print(
+                      f"FAIL: missing compile command: {target}"
+                  )
+                  failed = True
+                  continue
+
+              command = matches[0].get("command", "")
+
+              if "-fsanitize=thread" not in command:
+                  print(f"FAIL: TSan missing: {target}")
+                  failed = True
+              else:
+                  print(f"PASS: TSan instrumented: {target}")
+
+          if failed:
+              sys.exit(1)
+          PY
+
+      - name: Run prepared-key concurrency stress
+        shell: bash
+        env:
+          TSAN_OPTIONS: "halt_on_error=1"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-tsan \
+            -R '^public\.prepared_concurrency$' \
+            --repeat until-fail:20 \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Run full TSan suite
+        shell: bash
+        env:
+          TSAN_OPTIONS: "halt_on_error=1"
+        run: |
+          set -euo pipefail
+
+          ctest \
+            --test-dir build-tsan \
+            --output-on-failure \
+            --no-tests=error
+
+      - name: Upload TSan diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsan-diagnostics
+          if-no-files-found: ignore
+          path: |
+            build-tsan/compile_commands.json
+            build-tsan/Testing/Temporary/LastTest.log
+            build-tsan/CMakeFiles/*.log
 
   # ---------------------------------------------------------------------------
   # ACVP validation
