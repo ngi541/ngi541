@@ -8,6 +8,7 @@
 
 #include "engine/internal/crypto_types.h"
 #include "engine/internal/native.h"
+#include "engine/internal/prepared.h"
 #include "core/aes/aes_ctr.h"
 #include "core/sha/sha2.h"
 
@@ -225,6 +226,92 @@ aes_ctr_key_exp (ngi541_crypto_key_op_t kop, aes_ctr_key_data_t *key_data, const
     }
 }
 
+/*
+ * -------------------------------------------------------------------------
+ * Direct prepared AES-CTR execution
+ * -------------------------------------------------------------------------
+ *
+ * This path bypasses the generic ngi541_crypto_op_t/provider execution
+ * envelope.
+ *
+ * AES-CTR encryption and decryption are the same transform, so a single
+ * key-size-specific executor is used for both directions.
+ */
+
+static_always_inline ngi541_status_t
+aes_ctr_prepared_crypt (
+  const void *key_data,
+  uint8_t *iv,
+  const uint8_t *src,
+  uint8_t *dst,
+  uint32_t len,
+  aes_key_size_t ks)
+{
+  const aes_ctr_key_data_t *kd =
+    (const aes_ctr_key_data_t *) key_data;
+
+  aes_ctr_ctx_t ctx;
+
+  clib_aes_ctr_init (
+    &ctx,
+    kd,
+    iv,
+    ks);
+
+  clib_aes_ctr_transform (
+    &ctx,
+    src,
+    dst,
+    len,
+    ks);
+
+  return NGI541_STATUS_OK;
+}
+
+
+#define NGI541_DEFINE_PREPARED_AES_CTR(bits, ks)                         \
+  static ngi541_status_t                                                  \
+  aes##bits##_ctr_prepared_key_init (                                    \
+    void *key_data,                                                       \
+    const uint8_t *key,                                                   \
+    size_t key_len)                                                       \
+  {                                                                       \
+    if (key_data == NULL ||                                               \
+        key == NULL ||                                                    \
+        key_len != AES_KEY_BYTES (ks))                                    \
+      return NGI541_STATUS_INTERNAL_ERROR;                                \
+                                                                          \
+    clib_memset (                                                         \
+      key_data,                                                           \
+      0,                                                                  \
+      sizeof (aes_ctr_key_data_t));                                       \
+                                                                          \
+    clib_aes_ctr_key_expand (                                             \
+      (aes_ctr_key_data_t *) key_data,                                    \
+      key,                                                                \
+      ks);                                                                \
+                                                                          \
+    return NGI541_STATUS_OK;                                              \
+  }                                                                       \
+                                                                          \
+  static ngi541_status_t                                                  \
+  aes##bits##_ctr_prepared_crypt (                                       \
+    const void *key_data,                                                 \
+    uint8_t *iv,                                                          \
+    const uint8_t *src,                                                   \
+    uint8_t *dst,                                                         \
+    uint32_t len)                                                         \
+  {                                                                       \
+    return aes_ctr_prepared_crypt (                                       \
+      key_data, iv, src, dst, len, ks);                                   \
+  }
+
+NGI541_DEFINE_PREPARED_AES_CTR (128, AES_KEY_128)
+NGI541_DEFINE_PREPARED_AES_CTR (192, AES_KEY_192)
+NGI541_DEFINE_PREPARED_AES_CTR (256, AES_KEY_256)
+
+#undef NGI541_DEFINE_PREPARED_AES_CTR
+
 static_always_inline void
 aes_ctr_hmac_key_exp (ngi541_crypto_key_op_t kop, aes_ctr_sha2_hmac_key_data_t *key_data,
 		      const u8 *data, u16 hmac_length, u16 ctr_length, aes_key_size_t ks,
@@ -260,6 +347,75 @@ probe (void)
     return 10;
 #endif
   return -1;
+}
+
+/*
+ * Compile-time-defined prepared AES-CTR implementations.
+ *
+ * CPU capability probing and key-size selection happen only during
+ * prepared-key creation. The packet data path receives an already bound
+ * direct executor.
+ */
+
+static const ngi541_prepared_cipher_impl_t
+aes128_ctr_prepared_impl = {
+  .key_data_size = sizeof (aes_ctr_key_data_t),
+  .key_init = aes128_ctr_prepared_key_init,
+  .key_cleanup = NULL,
+
+  /*
+   * CTR encryption and decryption are identical.
+   */
+  .encrypt = aes128_ctr_prepared_crypt,
+  .decrypt = aes128_ctr_prepared_crypt,
+};
+
+static const ngi541_prepared_cipher_impl_t
+aes192_ctr_prepared_impl = {
+  .key_data_size = sizeof (aes_ctr_key_data_t),
+  .key_init = aes192_ctr_prepared_key_init,
+  .key_cleanup = NULL,
+  .encrypt = aes192_ctr_prepared_crypt,
+  .decrypt = aes192_ctr_prepared_crypt,
+};
+
+static const ngi541_prepared_cipher_impl_t
+aes256_ctr_prepared_impl = {
+  .key_data_size = sizeof (aes_ctr_key_data_t),
+  .key_init = aes256_ctr_prepared_key_init,
+  .key_cleanup = NULL,
+  .encrypt = aes256_ctr_prepared_crypt,
+  .decrypt = aes256_ctr_prepared_crypt,
+};
+
+
+const ngi541_prepared_cipher_impl_t *
+ngi541_native_prepared_aes_ctr_get (
+  size_t key_len)
+{
+  /*
+   * ISA capability probing is control-plane work.
+   *
+   * This function is called while binding a prepared key, never for an
+   * individual data-path operation.
+   */
+  if (probe () < 0)
+    return NULL;
+
+  switch (key_len)
+    {
+    case 16:
+      return &aes128_ctr_prepared_impl;
+
+    case 24:
+      return &aes192_ctr_prepared_impl;
+
+    case 32:
+      return &aes256_ctr_prepared_impl;
+
+    default:
+      return NULL;
+    }
 }
 
 static int
